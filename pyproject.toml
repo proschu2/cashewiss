@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cashewiss"
+version = "0.1.0"
+description = "Python library for integrating transactions from Swiss financial institutions with the Cashew budget app"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+    { name = "Sanzio", email = "github@sanziomonti.xyz" }
+]
+dependencies = [
+    "polars[excel]>=1.26.0",
+    "pydantic>=2.10.6",
+    "python-dateutil>=2.9.0.post0",
+    "click>=8.1.7",
+]
+
+[project.scripts]
+cashewiss = "cashewiss.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "black>=23.12.1",
+    "isort>=5.13.2",
+    "mypy>=1.8.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "pre-commit>=4.2.0",
+]
