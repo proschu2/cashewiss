@@ -73,18 +73,37 @@ def main():
 @click.option("--date-from", type=click.STRING, help="Start date (YYYY-MM-DD)")
 @click.option("--date-to", type=click.STRING, help="End date (YYYY-MM-DD)")
 @click.option(
-    "--cashew-url", default="https://budget-track.web.app", help="Cashew web app URL"
+    "--method",
+    type=click.Choice(["csv", "api"]),
+    default="csv",
+    help="Export method (default: csv)",
+)
+@click.option(
+    "--output",
+    type=click.Path(),
+    help="Output file path (required for CSV export unless --dry-run)",
+)
+@click.option(
+    "--cashew-url",
+    default="https://budget-track.web.app",
+    help="Cashew web app URL (API only)",
 )
 @click.option(
     "--name",
     default="SwissCard",
     help="Custom name for the processor (affects transaction notes)",
 )
-@click.option("--dry-run", is_flag=True, help="Only show URLs without opening browser")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview mode (shows first 5 rows for CSV, shows URL for API)",
+)
 def process(
     file_path: str,
     date_from: Optional[str],
     date_to: Optional[str],
+    method: str,
+    output: Optional[str],
     cashew_url: str,
     name: str,
     dry_run: bool,
@@ -99,9 +118,6 @@ def process(
 
         # Initialize processor with custom name and default category mappings
         processor = SwisscardProcessor(name=name)
-
-        # Initialize Cashew client
-        client = CashewClient(base_url=cashew_url)
 
         # Process transactions
         batch = processor.process(
@@ -135,26 +151,46 @@ def process(
                     f"  Amount: {t.meta['foreign_amount']} {t.meta['foreign_currency']}"
                 )
 
-        # Upload transactions or show URL
-        if dry_run:
-            url = client.upload_transactions(batch, dry_run=True)
-            click.echo("\nImport URL (first batch):")
-            click.echo(url)
-            click.echo(
-                f"\nNote: {len(batch.transactions)} transactions will be processed in batches of 25"
-            )
-        else:
-            click.echo("\nOpening browser windows to import transactions...")
-            try:
-                client.upload_transactions(batch)
-                click.echo(
-                    f"Done! Processed {len(batch.transactions)} transactions in batches of 25."
+        # Export using selected method
+        client = CashewClient(base_url=cashew_url)
+
+        if method == "csv":
+            if not dry_run and not output:
+                raise click.UsageError(
+                    "--output is required for CSV export unless --dry-run is used"
                 )
-            except RuntimeError as e:
-                click.echo(f"Error: {str(e)}")
-                click.echo(
-                    "\nAs an alternative, you can use --dry-run to get the URLs and open them manually."
+
+            if dry_run:
+                preview = client.export_to_csv(
+                    batch, output or "preview.csv", dry_run=True
                 )
+                click.echo("\nCSV Preview (first 5 rows):")
+                click.echo(preview)
+            else:
+                client.export_to_csv(batch, output)
+                click.echo(
+                    f"\nExported {len(batch.transactions)} transactions to {output}"
+                )
+        else:  # api
+            if dry_run:
+                preview = client.export_to_api(batch, dry_run=True)
+                click.echo("\nAPI Import URL:")
+                click.echo(preview)
+                click.echo(
+                    f"\nNote: {len(batch.transactions)} transactions will be processed in batches of 25"
+                )
+            else:
+                click.echo("\nOpening browser windows to import transactions...")
+                try:
+                    client.export_to_api(batch)
+                    click.echo(
+                        f"Done! Processed {len(batch.transactions)} transactions in batches of 25."
+                    )
+                except RuntimeError as e:
+                    click.echo(f"Error: {str(e)}")
+                    click.echo(
+                        "\nAs an alternative, you can use --dry-run to get the URLs and open them manually."
+                    )
 
     except Exception as e:
         click.echo(f"Error processing transactions: {str(e)}", err=True)

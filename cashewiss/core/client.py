@@ -105,15 +105,49 @@ class CashewClient:
             for i in range(0, len(transactions), max_size)
         ]
 
-    def upload_transactions(
+    def export_to_csv(
+        self, batch: TransactionBatch, output_path: str, dry_run: bool = False
+    ) -> Optional[str]:
+        """
+        Export transactions to CSV file in Cashew format.
+
+        Args:
+            batch: TransactionBatch to export
+            output_path: Path to save the CSV file
+            dry_run: If True, return preview of first 5 rows instead of writing file
+
+        Returns:
+            Preview string if dry_run=True, otherwise None
+        """
+        # Create header and rows for CSV
+        header = "Date,Amount,Category,Title,Note,Account"
+        rows = []
+        for t in batch.transactions:
+            # Format date as DD/MM/YYYY HH:mm
+            date_str = t.date.strftime("%d/%m/%Y 00:00")
+            # Create comma-separated row
+            row = f"{date_str},{t.amount},{t.category or ''},{t.title},{t.notes or ''},{t.account or ''}"
+            rows.append(row)
+
+        if dry_run:
+            # Return preview of header and first 5 rows
+            preview_rows = rows[:5]
+            return header + "\n" + "\n".join(preview_rows)
+
+        # Write header and all rows to file
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(header + "\n" + "\n".join(rows))
+        return None
+
+    def export_to_api(
         self, batch: TransactionBatch, dry_run: bool = False
     ) -> Optional[str]:
         """
-        Upload a batch of transactions to Cashew.
+        Export transactions via Cashew API.
 
         Args:
-            batch: A TransactionBatch instance containing the transactions to upload.
-            dry_run: If True, return the URL instead of opening it.
+            batch: TransactionBatch to export
+            dry_run: If True, return URL instead of opening browser
 
         Returns:
             URL string if dry_run=True, otherwise None
@@ -125,17 +159,15 @@ class CashewClient:
             # Return first batch URL for testing
             first_batch = TransactionBatch(transactions=batches[0], source=batch.source)
             return self.get_add_transaction_url(batch=first_batch)
-        else:
-            # Process each batch
-            for transactions in batches:
-                sub_batch = TransactionBatch(
-                    transactions=transactions, source=batch.source
-                )
-                try:
-                    url = self.get_add_transaction_url(batch=sub_batch)
-                    _open_url(url)
-                    time.sleep(10)
-                except Exception as e:
-                    raise RuntimeError(f"Failed to open batch in browser: {str(e)}")
 
-            return None
+        # Process each batch
+        for transactions in batches:
+            sub_batch = TransactionBatch(transactions=transactions, source=batch.source)
+            try:
+                url = self.get_add_transaction_url(batch=sub_batch)
+                _open_url(url)
+                time.sleep(10)
+            except Exception as e:
+                raise RuntimeError(f"Failed to open batch in browser: {str(e)}")
+
+        return None
