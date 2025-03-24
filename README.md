@@ -11,6 +11,7 @@ A Python library for processing and uploading transactions from Swiss financial 
 - Easy integration with Cashew API
 - Built with Polars for efficient data processing
 - Type-safe category and subcategory enums
+- Export to CSV in Cashew-compatible format
 
 ## Installation
 
@@ -33,22 +34,25 @@ uv pip install -e ".[dev]"
 Process transactions from the command line:
 
 ```bash
-# Process transactions from a Swisscard XLSX file
-cashewiss process transactions.xlsx
+# Process transactions from a Swisscard XLSX file (default: CSV export)
+cashewiss process transactions.xlsx --output output.csv
 
-# Process transactions for a specific date range
-cashewiss process transactions.xlsx --date-from 2024-01-01 --date-to 2024-03-23
+# Export as CSV with custom settings
+cashewiss process transactions.xlsx --output output.csv --date-from 2024-01-01 --date-to 2024-03-23
 
-# Use a different Cashew web app URL
-cashewiss process transactions.xlsx --cashew-url https://your-cashew-url.com
+# Preview CSV content (shows header + first 5 rows)
+cashewiss process transactions.xlsx --dry-run
+
+# Use API export instead of CSV
+cashewiss process transactions.xlsx --method api
+
+# API export with custom URL and dry run
+cashewiss process transactions.xlsx --method api --cashew-url https://your-cashew-url.com --dry-run
 
 # Use a custom processor name (affects transaction notes)
 cashewiss process transactions.xlsx --name "MyCard"
 
-# Show URLs without attempting to open browser (dry run mode)
-cashewiss process transactions.xlsx --dry-run
-
-Note: Transactions are processed in batches of 25 to handle URL length limits.
+Note: When using API export, transactions are processed in batches of 25 to handle URL length limits.
 If browser opening fails, use --dry-run to get URLs and open them manually.
 
 # Show available category mappings
@@ -63,20 +67,41 @@ from cashewiss import SwisscardProcessor, CashewClient
 
 # Initialize the processor and client
 processor = SwisscardProcessor()
-client = CashewClient(api_key="your-cashew-api-key")
+client = CashewClient()
 
 # Process transactions with optional date filtering
-transactions = processor.process(
-    "transactions.csv",
+batch = processor.process(
+    "transactions.xlsx",
     date_from=date(2024, 1, 1),
     date_to=date(2024, 3, 23)
 )
 
-# Upload to Cashew
-client.upload_transactions(transactions)  # Opens browser windows (25 transactions per batch)
+# Export to CSV
+client.export_to_csv(batch, "output.csv")  # Creates CSV file
+# Or preview CSV content
+preview = client.export_to_csv(batch, "output.csv", dry_run=True)
+
+# Or use API export
+client.export_to_api(batch)  # Opens browser windows (25 transactions per batch)
 # Or get URL without opening browser
-url = client.upload_transactions(transactions, dry_run=True)
+url = client.export_to_api(batch, dry_run=True)
 ```
+
+### CSV Export Format
+
+The CSV export follows this format:
+```
+Date,Amount,Category,Title,Note,Account
+23/03/2025 00:00,-50,Groceries,Fruits and Vegetables,Paid with cash,Sanzio
+```
+
+Fields:
+- Date: DD/MM/YYYY HH:mm format
+- Amount: Decimal number (negative for expenses)
+- Category: Transaction category
+- Title: Transaction description
+- Note: Additional notes (optional)
+- Account: Account name (optional)
 
 ### Category Mapping
 
@@ -155,7 +180,7 @@ Check out the `examples/` directory for complete working examples:
   - Date range filtering
   - Transaction batch processing
   - Accessing transaction details
-  - Generating Cashew import URLs
+  - Generating Cashew import URLs or CSV exports
 
 ## Supported Institutions
 
