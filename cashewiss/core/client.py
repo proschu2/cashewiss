@@ -4,7 +4,7 @@ import subprocess
 import platform
 from typing import Optional, List
 from datetime import date
-
+import time
 from .base import TransactionBatch, Transaction
 
 
@@ -134,6 +134,7 @@ class CashewClient:
                 try:
                     url = self.get_add_transaction_url(batch=sub_batch)
                     _open_url(url)
+                    time.sleep(10)
                 except Exception as e:
                     raise RuntimeError(f"Failed to open batch in browser: {str(e)}")
 
