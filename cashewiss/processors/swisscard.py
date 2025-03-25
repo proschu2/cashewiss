@@ -183,13 +183,18 @@ class SwisscardProcessor(BaseTransactionProcessor):
     def __init__(self, name: str = "SwissCard"):
         # Set both category and merchant mappings by default
         super().__init__(name=name)
+        # Override default column names for Swisscard format
+        self.merchant_column = "Merchant"
+        self.merchant_category_column = "Merchant Category"
+        self.description_column = "Description"
+        self.registered_category_column = "Registered Category"
         self.set_category_mapper(
-            self.SUGGESTED_MERCHANT_CATEGORY_MAPPING, "merchant_category"
+            self.SUGGESTED_MERCHANT_CATEGORY_MAPPING, self.merchant_category_column
         )
         self.set_category_mapper(
-            self.SUGGESTED_REGISTERED_CATEGORY_MAPPING, "registered_category"
+            self.SUGGESTED_REGISTERED_CATEGORY_MAPPING, self.registered_category_column
         )
-        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, "merchant")
+        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
 
     def load_data(
         self,
@@ -210,11 +215,11 @@ class SwisscardProcessor(BaseTransactionProcessor):
         # Ensure required columns exist
         required_cols = [
             "Transaction date",
-            "Description",
+            self.description_column,
             "Amount",
             "Currency",
-            "Merchant Category",
-            "Registered Category",
+            self.merchant_category_column,
+            self.registered_category_column,
             "Status",
         ]
         missing_cols = [col for col in required_cols if col not in df.columns]
@@ -242,17 +247,12 @@ class SwisscardProcessor(BaseTransactionProcessor):
             if row["Status"] != "Posted" or row["Debit/Credit"] == "Credit":
                 continue
 
-            # Map the merchant category to standardized categories
-            merchant_category = row["Merchant Category"]
-            merchant = row.get("Merchant")
-            description = row["Description"]
-            mapped_categories = self._map_category(
-                merchant_category, merchant, description
-            )
+            # Map categories using the row data
+            mapped_categories = self._map_category(row)
 
             transaction = Transaction(
                 date=row["Transaction date"],
-                title=merchant or description,
+                title=row.get(self.merchant_column) or row[self.description_column],
                 amount=-float(
                     row["Amount"]
                 ),  # Negate amount since debit is positive in source
@@ -266,8 +266,14 @@ class SwisscardProcessor(BaseTransactionProcessor):
                     "card_number": row["Card number"],
                     "foreign_currency": row.get("Foreign Currency"),
                     "foreign_amount": row.get("Amount in foreign currency"),
-                    "original_merchant_category": merchant_category,
-                    "original_registered_category": row["Registered Category"],
+                    "original_merchant_category": row.get(
+                        self.merchant_category_column
+                    ),
+                    "original_registered_category": row.get(
+                        self.registered_category_column
+                    )
+                    if self.registered_category_column
+                    else None,
                     "original_row": row,
                 },
             )

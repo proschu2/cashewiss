@@ -61,15 +61,16 @@ class BaseTransactionProcessor(ABC):
         self._df: Optional[pl.DataFrame] = None
         self._loaded_data: Optional[pl.DataFrame] = None
         self._transformed_data: Optional[List[Transaction]] = None
-        self._category_mappers: Dict[str, Dict[str, Dict[str, str]]] = {
-            "merchant_category": {},
-            "merchant": {},
-            "description": {},
-            "registered_category": {},
-        }
+
+        # Default column names that can be overridden by processors
+        self.merchant_column: str = "Merchant"
+        self.merchant_category_column: str = "Merchant Category"
+        self.description_column: str = "Description"
+        self.registered_category_column: str = "Registered Category"
+        self._category_mappers: Dict[str, Dict[str, Dict[str, str]]] = {}
 
     def set_category_mapper(
-        self, mapper: Dict[str, Dict[str, str]], mapper_type: str = "merchant_category"
+        self, mapper: dict[str, dict[str, str]], mapper_type: str
     ) -> None:
         """
         Set the category mapping dictionary.
@@ -86,10 +87,8 @@ class BaseTransactionProcessor(ABC):
                        }
                    }
         """
-        if mapper_type not in self._category_mappers:
-            raise ValueError(
-                f"Invalid mapper type. Must be one of: {', '.join(self._category_mappers.keys())}"
-            )
+        if mapper_type is None:
+            raise ValueError("mapper_type cannot be None")
         self._category_mappers[mapper_type] = mapper
 
     @abstractmethod
@@ -107,42 +106,28 @@ class BaseTransactionProcessor(ABC):
         """Transform the loaded data into Transaction objects."""
         pass
 
-    def _map_category(
-        self,
-        provider_category: Optional[str],
-        merchant: Optional[str] = None,
-        description: Optional[str] = None,
-    ) -> Dict[str, Optional[str]]:
+    def _map_category(self, row: Dict[str, Any]) -> dict[str, Optional[str]]:
         """
         Map transaction data to standardized category and subcategory using multiple strategies.
 
         Args:
-            provider_category: The category string from the provider
-            merchant: The merchant name
-            description: The transaction description
+            row: The transaction row data
 
         Returns:
             Dictionary with 'category' and 'subcategory' keys
         """
-        # Try merchant-specific mapping first
-        if merchant and merchant in self._category_mappers["merchant"]:
-            return self._category_mappers["merchant"][merchant]
-
-        # Try description-based mapping
-        if description and description in self._category_mappers["description"]:
-            return self._category_mappers["description"][description]
-
-        # Fall back to registered/merchant category mapping
-        if (
-            provider_category
-            and provider_category in self._category_mappers["registered_category"]
+        for col in zip(
+            [
+                self.merchant_column,
+                self.description_column,
+                self.registered_category_column,
+                self.merchant_category_column,
+            ]
         ):
-            return self._category_mappers["registered_category"][provider_category]
-        if (
-            provider_category
-            and provider_category in self._category_mappers["merchant_category"]
-        ):
-            return self._category_mappers["merchant_category"][provider_category]
+            if col is None:
+                continue
+            if row.get(col) in self._category_mappers[col]:
+                return self._category_mappers[col][row[col]]
 
         return {"category": None, "subcategory": None}
 

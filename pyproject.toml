@@ -7,7 +7,7 @@ name = "cashewiss"
 version = "0.1.0"
 description = "Python library for integrating transactions from Swiss financial institutions with the Cashew budget app"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Sanzio", email = "github@sanziomonti.xyz" }
@@ -17,12 +17,15 @@ dependencies = [
     "pydantic>=2.10.6",
     "python-dateutil>=2.9.0.post0",
     "click>=8.1.7",
+    "python-dotenv>=1.0.1",
 ]
+
 
 [project.scripts]
 cashewiss = "cashewiss.cli:main"
 
 [project.optional-dependencies]
+viseca = ["viseca>=0.1.1"]
 dev = [
     "pytest>=7.4.4",
     "black>=23.12.1",

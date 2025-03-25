@@ -16,7 +16,8 @@ A Python library for processing and uploading transactions from Swiss financial 
 ## Installation
 
 ```bash
-uv pip install cashewiss
+uv pip install cashewiss  # Basic installation
+uv pip install 'cashewiss[viseca]'  # With Viseca support
 ```
 
 Or install in development mode:
@@ -55,8 +56,18 @@ cashewiss process transactions.xlsx --name "MyCard"
 Note: When using API export, transactions are processed in batches of 25 to handle URL length limits.
 If browser opening fails, use --dry-run to get URLs and open them manually.
 
+# Using Viseca processor with API
+cashewiss process --processor viseca
+
 # Show available category mappings
 cashewiss categories
+```
+
+When using the Viseca processor, configure credentials in a .env file:
+```bash
+VISECA_USERNAME=your_username
+VISECA_PASSWORD=your_password
+VISECA_CARD_ID=your_card_id
 ```
 
 ### Python API
@@ -187,6 +198,7 @@ Check out the `examples/` directory for complete working examples:
 Currently supported financial institutions:
 
 - Swisscard (XLSX format)
+- Viseca (API access)
 
 ## Contributing
 

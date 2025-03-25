@@ -1,9 +1,13 @@
 from datetime import datetime
 import click
+import importlib.util
 from typing import Optional
+
+from dotenv import load_dotenv
 
 from cashewiss import (
     SwisscardProcessor,
+    VisecaProcessor,
     CashewClient,
     Category,
     ProviderCategoryMapper,
@@ -65,11 +69,12 @@ def setup_category_mapper():
 @click.group()
 def main():
     """Cashewiss - Process Swiss financial transactions for Cashew budget app"""
+    load_dotenv()
     pass
 
 
 @main.command()
-@click.argument("file_path", type=click.Path(exists=True))
+@click.argument("file_path", type=click.Path(exists=True), required=False)
 @click.option("--date-from", type=click.STRING, help="Start date (YYYY-MM-DD)")
 @click.option("--date-to", type=click.STRING, help="End date (YYYY-MM-DD)")
 @click.option(
@@ -94,21 +99,28 @@ def main():
     help="Custom name for the processor (affects transaction notes)",
 )
 @click.option(
+    "--processor",
+    type=click.Choice(["swisscard", "viseca"]),
+    default="swisscard",
+    help="Processor to use (default: swisscard)",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Preview mode (shows first 5 rows for CSV, shows URL for API)",
 )
 def process(
-    file_path: str,
+    file_path: Optional[str],
     date_from: Optional[str],
     date_to: Optional[str],
     method: str,
     output: Optional[str],
     cashew_url: str,
     name: str,
+    processor: str,
     dry_run: bool,
 ):
-    """Process transactions from a Swisscard XLSX file"""
+    """Process transactions from a Swisscard XLSX file or Viseca API"""
     try:
         # Parse dates if provided
         from_date = (
@@ -117,10 +129,24 @@ def process(
         to_date = datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else None
 
         # Initialize processor with custom name and default category mappings
-        processor = SwisscardProcessor(name=name)
+        if processor == "swisscard":
+            if not file_path:
+                raise click.UsageError("file_path is required for Swisscard processor")
+            processor_instance = SwisscardProcessor(name=name)
+        else:  # viseca
+            if importlib.util.find_spec("viseca") is None:
+                raise click.UsageError(
+                    "Viseca processor requires the viseca package. "
+                    "Install it with: pip install cashewiss[viseca]"
+                )
+            processor_instance = VisecaProcessor(name=name)
+            if file_path:
+                click.echo(
+                    "Note: file_path is ignored for Viseca processor as it uses API"
+                )
 
         # Process transactions
-        batch = processor.process(
+        batch = processor_instance.process(
             file_path=file_path, date_from=from_date, date_to=to_date
         )
 
@@ -141,9 +167,10 @@ def process(
                 click.echo(
                     f"  Merchant Category: {t.meta['original_merchant_category']}"
                 )
-                click.echo(
-                    f"  Registered Category: {t.meta['original_registered_category']}"
-                )
+                if "original_registered_category" in t.meta:
+                    click.echo(
+                        f"  Registered Category: {t.meta['original_registered_category']}"
+                    )
 
             if t.meta and t.meta.get("foreign_amount"):
                 click.echo("\nForeign Currency Info:")
