@@ -120,13 +120,13 @@ class CashewClient:
             Preview string if dry_run=True, otherwise None
         """
         # Create header and rows for CSV
-        header = "Date,Amount,Category,Title,Note,Account"
+        header = "Date,Amount,Category,Subcategory,Title,Note,Account"
         rows = []
         for t in batch.transactions:
             # Format date as DD/MM/YYYY HH:mm
             date_str = t.date.strftime("%d/%m/%Y 00:00")
             # Create comma-separated row
-            row = f"{date_str},{t.amount},{t.category or ''},{t.title},{t.notes or ''},{t.account or ''}"
+            row = f"{date_str},{t.amount},{t.category.value if t.category else ''},{t.subcategory.value if t.subcategory else ''},{t.title},{t.notes or ''},{t.account or ''}"
             rows.append(row)
 
         if dry_run:

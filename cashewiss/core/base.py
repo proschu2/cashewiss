@@ -3,34 +3,17 @@ from datetime import date
 from typing import Optional, Dict, Any, List
 
 import polars as pl
-from pydantic import BaseModel
 
-
-class Transaction(BaseModel):
-    """
-    Represents a financial transaction with all possible parameters.
-
-    Attributes:
-        amount (float): The amount of the transaction. Negative for expenses, positive for income.
-        title (str): The title/description of the transaction.
-        notes (Optional[str]): Additional notes about the transaction.
-        date (date): The date of the transaction.
-        category (Optional[str]): Category name (case-insensitive search).
-        subcategory (Optional[str]): Subcategory name (case-insensitive search).
-        account (Optional[str]): Account name (case-insensitive search).
-        currency (str): The currency of the transaction.
-        meta (Dict[str, Any]): Additional metadata about the transaction.
-    """
-
-    amount: float
-    title: str
-    date: date
-    currency: str
-    notes: Optional[str] = None
-    category: Optional[str] = None
-    subcategory: Optional[str] = None
-    account: Optional[str] = None
-    meta: Dict[str, Any] = {}
+from .models import Transaction, ProcessorConfig, CategoryMapping
+from .enums import (
+    Category,
+    DiningSubcategory,
+    EssentialsSubcategory,
+    ShoppingSubcategory,
+    LeisureSubcategory,
+    PersonalCareSubcategory,
+    HobbiesSubcategory,
+)
 
 
 class TransactionBatch:
@@ -46,8 +29,8 @@ class TransactionBatch:
                 "title": t.title,
                 "amount": t.amount,
                 "currency": t.currency,
-                "category": t.category,
-                "subcategory": t.subcategory,
+                "category": t.category.value if t.category else None,
+                "subcategory": t.subcategory.value if t.subcategory else None,
                 "account": t.account,
                 "notes": t.notes,
             }
@@ -56,40 +39,188 @@ class TransactionBatch:
 
 
 class BaseTransactionProcessor(ABC):
+    """Base class for transaction processors with shared merchant mappings."""
+
+    # Shared merchant mappings for all processors
+    SUGGESTED_MERCHANT_MAPPING = {
+        "GASTRO TECHNOPARK ZH": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        "SV (Schweiz) AG": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        # Dining - Delivery
+        "Burger King": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "Subway": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "Uber Eats": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        # Transit and Travel
+        "Shell": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "Socar": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # Shopping
+        "WOMO STORE": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Deichmann": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "FREITAG Geroldstrasse": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Blue Tomato": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Decathlon": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Transa Backpacking AG": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "SportX": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "InMedia Haus GmbH": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "Orell Füssli": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
+        "geschenkidee.ch": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.GIFTS
+        ),
+        # Personal Care & Health
+        "Coop Vitality": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "Medbase Apotheke": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "Akademischer Sportverband Zürich": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        # Events and Venues
+        "Hallenstadion Zürich": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "ZÜRICH OPENAIR": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "ZO Festival AG": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Ticketcorner": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Moods": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Theater 00 Zuerich": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Rent-a-Theater AG": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        # Entertainment and Activities
+        "Zuerichtheescape.p": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "Live Escape Game Schwe": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "the escape GmbH": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        # Technology
+        "Google Cloud": CategoryMapping(
+            category=Category.HOBBIES, subcategory=HobbiesSubcategory.TECH
+        ),
+    }
+
     def __init__(self, name: str):
         self.name = name
         self._df: Optional[pl.DataFrame] = None
         self._loaded_data: Optional[pl.DataFrame] = None
         self._transformed_data: Optional[List[Transaction]] = None
+        self._config = ProcessorConfig(name=name)
 
         # Default column names that can be overridden by processors
         self.merchant_column: str = "Merchant"
         self.merchant_category_column: str = "Merchant Category"
         self.description_column: str = "Description"
         self.registered_category_column: str = "Registered Category"
-        self._category_mappers: Dict[str, Dict[str, Dict[str, str]]] = {}
+
+        # Initialize base mappings with shared merchant mappings
+        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
 
     def set_category_mapper(
-        self, mapper: dict[str, dict[str, str]], mapper_type: str
+        self, mapper: Dict[str, CategoryMapping], mapper_type: str
     ) -> None:
         """
-        Set the category mapping dictionary.
+        Update the category mapping dictionary with validation.
 
         Args:
-            mapper: A nested dictionary where:
-                   - First level key is the provider's category
-                   - Second level is a dict with 'category' and 'subcategory' keys
-                   Example:
-                   {
-                       "GROCERY_STORES": {
-                           "category": "Food & Dining",
-                           "subcategory": "Groceries"
-                       }
-                   }
+            mapper: A dictionary mapping merchant names to CategoryMapping objects
+            mapper_type: The type of mapper to update (merchant, merchant_category, or registered_category)
         """
-        if mapper_type is None:
-            raise ValueError("mapper_type cannot be None")
-        self._category_mappers[mapper_type] = mapper
+        if mapper_type == self.merchant_column:
+            target_mappings = self._config.merchant_mappings
+        elif mapper_type == self.merchant_category_column:
+            target_mappings = self._config.merchant_category_mappings
+        elif mapper_type == self.registered_category_column:
+            target_mappings = self._config.registered_category_mappings
+        else:
+            raise ValueError(f"Unknown mapper type: {mapper_type}")
+
+        # Since we're already receiving CategoryMapping objects, just copy them over
+        for key, value in mapper.items():
+            # If value is already a CategoryMapping, use it directly
+            if isinstance(value, CategoryMapping):
+                target_mappings[key] = value
+            else:
+                # Otherwise, create a new CategoryMapping from the dict
+                target_mappings[key] = CategoryMapping(
+                    category=value["category"], subcategory=value.get("subcategory")
+                )
+
+    def _map_category(self, row: Dict[str, Any]) -> CategoryMapping:
+        """
+        Map transaction data to standardized category and subcategory using multiple strategies.
+
+        Args:
+            row: The transaction row data
+
+        Returns:
+            CategoryMapping object with category and optional subcategory
+        """
+        # Try merchant mapping first
+        if self.merchant_column and row.get(self.merchant_column):
+            if mapping := self._config.merchant_mappings.get(row[self.merchant_column]):
+                return mapping
+
+        # Try merchant category mapping
+        if self.merchant_category_column and row.get(self.merchant_category_column):
+            if mapping := self._config.merchant_category_mappings.get(
+                row[self.merchant_category_column]
+            ):
+                return mapping
+
+        # Try registered category mapping
+        if self.registered_category_column and row.get(self.registered_category_column):
+            if mapping := self._config.registered_category_mappings.get(
+                row[self.registered_category_column]
+            ):
+                return mapping
+
+        return CategoryMapping(category=Category.SHOPPING, subcategory=None)
 
     @abstractmethod
     def load_data(
@@ -105,31 +236,6 @@ class BaseTransactionProcessor(ABC):
     def transform_data(self) -> List[Transaction]:
         """Transform the loaded data into Transaction objects."""
         pass
-
-    def _map_category(self, row: Dict[str, Any]) -> dict[str, Optional[str]]:
-        """
-        Map transaction data to standardized category and subcategory using multiple strategies.
-
-        Args:
-            row: The transaction row data
-
-        Returns:
-            Dictionary with 'category' and 'subcategory' keys
-        """
-        for col in zip(
-            [
-                self.merchant_column,
-                self.description_column,
-                self.registered_category_column,
-                self.merchant_category_column,
-            ]
-        ):
-            if col is None:
-                continue
-            if row.get(col) in self._category_mappers[col]:
-                return self._category_mappers[col][row[col]]
-
-        return {"category": None, "subcategory": None}
 
     def process(
         self,

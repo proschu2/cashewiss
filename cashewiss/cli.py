@@ -1,7 +1,7 @@
 from datetime import datetime
 import click
 import importlib.util
-from typing import Optional
+from typing import Optional, Dict
 
 from dotenv import load_dotenv
 
@@ -9,61 +9,87 @@ from cashewiss import (
     SwisscardProcessor,
     VisecaProcessor,
     CashewClient,
+    CategoryMapping,
     Category,
-    ProviderCategoryMapper,
+    EssentialsSubcategory,
     DiningSubcategory,
-    GroceriesSubcategory,
     ShoppingSubcategory,
-    EntertainmentSubcategory,
-    BillsFeesSubcategory,
-    BeautyHealthSubcategory,
+    LeisureSubcategory,
+    BillsSubcategory,
+    PersonalCareSubcategory,
+    HouseholdSubcategory,
+    HobbiesSubcategory,
 )
 
 
-def setup_category_mapper():
-    """Create and configure the default category mapper"""
-    mapper = ProviderCategoryMapper()
-
-    # Add default mappings
-    mapper.add_mapping("GROCERY STORES", Category.GROCERIES, GroceriesSubcategory.MEAL)
-    mapper.add_mapping(
-        "CONVENIENCE STORES", Category.GROCERIES, GroceriesSubcategory.SNACKS
-    )
-    mapper.add_mapping("RESTAURANTS", Category.DINING, DiningSubcategory.FRIENDS)
-    mapper.add_mapping(
-        "FAST FOOD RESTAURANTS", Category.DINING, DiningSubcategory.DELIVERY
-    )
-    mapper.add_mapping("BUSINESS DINING", Category.DINING, DiningSubcategory.WORK)
-    mapper.add_mapping("TRANSPORTATION", Category.TRANSIT)
-    mapper.add_mapping(
-        "CLOTHING STORES", Category.SHOPPING, ShoppingSubcategory.CLOTHES
-    )
-    mapper.add_mapping(
-        "ELECTRONICS", Category.SHOPPING, ShoppingSubcategory.ELECTRONICS
-    )
-    mapper.add_mapping("GAME/TOY STORES", Category.SHOPPING, ShoppingSubcategory.GAMES)
-    mapper.add_mapping(
-        "HOUSEHOLD APPLIANCE STORES", Category.SHOPPING, ShoppingSubcategory.KITCHEN
-    )
-    mapper.add_mapping(
-        "TICKETING AGENCIES", Category.ENTERTAINMENT, EntertainmentSubcategory.CONCERTS
-    )
-    mapper.add_mapping(
-        "TELECOMMUNICATION SERVICES", Category.BILLS_FEES, BillsFeesSubcategory.TELECOM
-    )
-    mapper.add_mapping(
-        "MEDICAL SERVICES", Category.BILLS_FEES, BillsFeesSubcategory.HEALTH
-    )
-    mapper.add_mapping(
-        "DRUG STORES", Category.BEAUTY_HEALTH, BeautyHealthSubcategory.HEALTH
-    )
-    mapper.add_mapping(
-        "COSMETIC STORES", Category.BEAUTY_HEALTH, BeautyHealthSubcategory.BEAUTY
-    )
-    mapper.add_mapping("GIFT SHOPS", Category.GIFTS)
-    mapper.add_mapping("TRAVEL AGENCIES", Category.TRAVEL)
-
-    return mapper
+def setup_category_mapper() -> Dict[str, CategoryMapping]:
+    """Create and configure the default category mapper for merchant categories"""
+    default_mappings = {
+        # Groceries and Dining
+        "GROCERY STORES": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "CONVENIENCE STORES": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "RESTAURANTS": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "FAST FOOD RESTAURANTS": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "BUSINESS DINING": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        # Transit
+        "TRANSPORTATION": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # Shopping
+        "CLOTHING STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "ELECTRONICS": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "GAME/TOY STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
+        # Household
+        "HOUSEHOLD APPLIANCE STORES": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.APPLIANCES
+        ),
+        # Entertainment and Leisure
+        "TICKETING AGENCIES": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        # Bills and Services
+        "TELECOMMUNICATION SERVICES": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TELECOM
+        ),
+        "MEDICAL SERVICES": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        # Personal Care
+        "DRUG STORES": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "COSMETIC STORES": CategoryMapping(
+            category=Category.PERSONAL_CARE,
+            subcategory=PersonalCareSubcategory.PERSONAL,
+        ),
+        # Shopping - Gifts
+        "GIFT SHOPS": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.GIFTS
+        ),
+        # Travel
+        "TRAVEL AGENCIES": CategoryMapping(category=Category.TRAVEL),
+        # Hobbies
+        "HOBBY STORES": CategoryMapping(
+            category=Category.HOBBIES, subcategory=HobbiesSubcategory.TECH
+        ),
+    }
+    return default_mappings
 
 
 @click.group()
@@ -96,7 +122,11 @@ def main():
 @click.option(
     "--name",
     default="SwissCard",
-    help="Custom name for the processor (affects transaction notes)",
+    help="Custom name for the processor (used in transaction notes)",
+)
+@click.option(
+    "--account",
+    help="Custom account name (if different from processor name)",
 )
 @click.option(
     "--processor",
@@ -117,6 +147,7 @@ def process(
     output: Optional[str],
     cashew_url: str,
     name: str,
+    account: Optional[str],
     processor: str,
     dry_run: bool,
 ):
@@ -128,18 +159,18 @@ def process(
         )
         to_date = datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else None
 
-        # Initialize processor with custom name and default category mappings
+        # Initialize processor with custom name, account and default category mappings
         if processor == "swisscard":
             if not file_path:
                 raise click.UsageError("file_path is required for Swisscard processor")
-            processor_instance = SwisscardProcessor(name=name)
+            processor_instance = SwisscardProcessor(name=name, account=account)
         else:  # viseca
             if importlib.util.find_spec("viseca") is None:
                 raise click.UsageError(
                     "Viseca processor requires the viseca package. "
                     "Install it with: pip install cashewiss[viseca]"
                 )
-            processor_instance = VisecaProcessor(name=name)
+            processor_instance = VisecaProcessor(name=name, account=account)
             if file_path:
                 click.echo(
                     "Note: file_path is ignored for Viseca processor as it uses API"
@@ -159,8 +190,8 @@ def process(
             click.echo(f"Date: {t.date}")
             click.echo(f"Title: {t.title}")
             click.echo(f"Amount: {t.amount} {t.currency}")
-            click.echo(f"Category: {t.category}")
-            click.echo(f"Subcategory: {t.subcategory}")
+            click.echo(f"Category: {t.category.value if t.category else None}")
+            click.echo(f"Subcategory: {t.subcategory.value if t.subcategory else None}")
             click.echo(f"Account: {t.account}")
             if t.meta and t.meta.get("original_merchant_category"):
                 click.echo("Original Categories:")
@@ -226,13 +257,14 @@ def process(
 @main.command()
 def categories():
     """Show available category mappings"""
-    mapper = setup_category_mapper()
-    mappings = mapper.to_dict()
+    mappings = setup_category_mapper()
 
     click.echo("Available category mappings:")
-    for merchant_category, (category, subcategory) in mappings.items():
-        subcategory_str = f" -> {subcategory}" if subcategory else ""
-        click.echo(f"{merchant_category}: {category}{subcategory_str}")
+    for merchant_category, mapping in mappings.items():
+        subcategory_str = (
+            f" -> {mapping.subcategory.value}" if mapping.subcategory else ""
+        )
+        click.echo(f"{merchant_category}: {mapping.category.value}{subcategory_str}")
 
 
 if __name__ == "__main__":

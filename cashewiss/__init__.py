@@ -3,18 +3,29 @@ Cashewiss - Swiss Financial Institution Transaction Processor for Cashew
 """
 
 from .core.base import Transaction, TransactionBatch, BaseTransactionProcessor
-from .core.categories import (
+from .core.models import (
+    CategoryMapping,
+    ProcessorConfig,
+    MerchantCategoryMapping,
+    CategoryMigration,
+)
+from .core.enums import (
     Category,
-    ProviderCategoryMapper,
+    IncomeSubcategory,
+    BillsSubcategory,
+    EssentialsSubcategory,
     DiningSubcategory,
-    GroceriesSubcategory,
     ShoppingSubcategory,
-    EntertainmentSubcategory,
-    BillsFeesSubcategory,
-    BeautyHealthSubcategory,
+    HouseholdSubcategory,
+    PersonalCareSubcategory,
+    LeisureSubcategory,
+    HobbiesSubcategory,
+    TravelSubcategory,
+    FinancialSubcategory,
 )
 from .core.client import CashewClient
 from .processors.swisscard import SwisscardProcessor
+from .processors.viseca import VisecaProcessor
 
 __version__ = "0.1.0"
 __all__ = [
@@ -23,12 +34,23 @@ __all__ = [
     "BaseTransactionProcessor",
     "CashewClient",
     "SwisscardProcessor",
+    "VisecaProcessor",
+    # Category Enums
     "Category",
-    "ProviderCategoryMapper",
+    "IncomeSubcategory",
+    "BillsSubcategory",
+    "EssentialsSubcategory",
     "DiningSubcategory",
-    "GroceriesSubcategory",
     "ShoppingSubcategory",
-    "EntertainmentSubcategory",
-    "BillsFeesSubcategory",
-    "BeautyHealthSubcategory",
+    "HouseholdSubcategory",
+    "PersonalCareSubcategory",
+    "LeisureSubcategory",
+    "HobbiesSubcategory",
+    "TravelSubcategory",
+    "FinancialSubcategory",
+    # Models
+    "CategoryMapping",
+    "ProcessorConfig",
+    "MerchantCategoryMapping",
+    "CategoryMigration",
 ]

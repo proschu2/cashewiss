@@ -8,117 +8,55 @@ from dotenv import load_dotenv
 import polars as pl
 
 from ..core.base import BaseTransactionProcessor, Transaction
+from ..core.models import CategoryMapping
+from ..core.enums import (
+    Category,
+    DiningSubcategory,
+    ShoppingSubcategory,
+    LeisureSubcategory,
+    BillsSubcategory,
+    PersonalCareSubcategory,
+)
 
 
 class VisecaProcessor(BaseTransactionProcessor):
     """Processor for Viseca credit card transactions."""
 
-    SUGGESTED_MERCHANT_MAPPING = {
-        # Groceries
-        "Denner": {"category": "Groceries", "subcategory": "Meal"},
-        "Lidl": {"category": "Groceries", "subcategory": "Meal"},
-        "Migros": {"category": "Groceries", "subcategory": "Meal"},
-        "Coop": {"category": "Groceries", "subcategory": "Meal"},
-        "Volg": {"category": "Groceries", "subcategory": "Meal"},
-        "Alnatura": {"category": "Groceries", "subcategory": "Meal"},
-        "Migrolino": {"category": "Groceries", "subcategory": "Snacks"},
-        "Coop Pronto": {"category": "Groceries", "subcategory": "Snacks"},
-        "Selecta": {"category": "Groceries", "subcategory": "Snacks"},
-        # Restaurants & Dining
-        "ZETT Restaurant": {"category": "Dining", "subcategory": "Friends"},
-        "Pho Vietnam ZH": {"category": "Dining", "subcategory": "Friends"},
-        "Migros Restaurant": {"category": "Dining", "subcategory": "Work"},
-        "La Penisola": {"category": "Dining", "subcategory": "Friends"},
-        "McDonald's": {"category": "Dining", "subcategory": "Delivery"},
-        "Too Good To Go": {"category": "Dining", "subcategory": "Delivery"},
-        "Restaurant Talstation Rotair": {
-            "category": "Dining",
-            "subcategory": "Friends",
-        },
-        "Stern Gastro-Imbiss Inh.M": {"category": "Dining", "subcategory": "Delivery"},
-        "Escher Wyss Platz Kebap G": {"category": "Dining", "subcategory": "Delivery"},
-        "Bo's Co Gastro GmbH": {"category": "Dining", "subcategory": "Friends"},
-        "SV (Schweiz) AG": {"category": "Dining", "subcategory": "Work"},
-        # Bakeries
-        "Bäckerei Hug": {"category": "Dining", "subcategory": None},
-        "St Jakob Beck im Viadukt": {"category": "Dining", "subcategory": None},
-        # Bars & Entertainment
-        "Plaza Klub Zürich": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Barmuenster": {"category": "Entertainment", "subcategory": None},
-        "Moods": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Bar KIR ROYAL": {"category": "Entertainment", "subcategory": None},
-        "Hallenstadion Zürich": {
-            "category": "Entertainment",
-            "subcategory": "Concerts",
-        },
-        "Theater 00 Zuerich": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Rent-a-Theater AG": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Wendel's Kapelle": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Kafi Schnaps": {"category": "Entertainment", "subcategory": None},
-        "Enfant terrible Gastro Gm": {"category": "Entertainment", "subcategory": None},
-        # Sports & Hobbies
-        "Boulderlounge": {"category": "Hobbies", "subcategory": "Bouldern"},
-        "Minimum- Boulder Bar Leut": {"category": "Hobbies", "subcategory": "Bouldern"},
-        "Kraftreaktor Aarau AG": {"category": "Hobbies", "subcategory": "Bouldern"},
-        "SalsaRica AG": {"category": "Hobbies", "subcategory": "Salsa"},
-        # Shopping
-        "Decathlon": {"category": "Shopping", "subcategory": None},
-        "InMedia Haus GmbH": {"category": "Shopping", "subcategory": "Electronics"},
-        "Orell Füssli": {"category": "Shopping", "subcategory": None},
-        "Transa Backpacking AG": {"category": "Shopping", "subcategory": "Clothes"},
-        "SportX": {"category": "Shopping", "subcategory": None},
-        # Escape Rooms & Games
-        "Zuerichtheescape.p": {"category": "Entertainment", "subcategory": None},
-        "Live Escape Game Schwe": {"category": "Entertainment", "subcategory": None},
-        "the escape GmbH": {"category": "Entertainment", "subcategory": None},
-        # Beauty & Health
-        "Coiffeur Tablo": {"category": "Beauty & Health", "subcategory": "Beauty"},
-        "Coiffeur 0 Jallki": {"category": "Beauty & Health", "subcategory": "Beauty"},
-        # Transit
-        "Uber": {"category": "Transit", "subcategory": None},
-        "PubliBike": {"category": "Transit", "subcategory": None},
-        # Travel & Hotels
-        "Hotel Sporting": {"category": "Travel", "subcategory": None},
-        "Berghus Spirstock": {"category": "Travel", "subcategory": None},
-        # Others/Uncategorized
-        "Sujanth GmbH": {"category": "Shopping", "subcategory": None},
-        "Maison Leo AG": {"category": "Shopping", "subcategory": None},
-        "Genossenschaft Schweiz": {"category": "Shopping", "subcategory": None},
-        "POSTFINANCE Piazza Bar B": {"category": "Shopping", "subcategory": None},
-        None: {"category": "Shopping", "subcategory": None},
-    }
+    # Empty since merchant mappings are now in base class
+    SUGGESTED_MERCHANT_MAPPING = {}
 
     SUGGESTED_MERCHANT_CATEGORY_MAPPING = {
-        # Food & Dining Related
-        "Bakery": {"category": "Dining", "subcategory": None},
-        "Bar/Club": {"category": "Entertainment", "subcategory": None},
-        "Canteen": {"category": "Dining", "subcategory": "Work"},
-        "Fast Food Restaurant": {"category": "Dining", "subcategory": "Delivery"},
-        "Food": {"category": "Dining", "subcategory": None},
-        "Restaurant": {"category": "Dining", "subcategory": None},
-        "Supermarket": {"category": "Groceries", "subcategory": "Meal"},
-        # Shopping & Retail
-        "Book Shop": {"category": "Shopping", "subcategory": None},
-        "Office Supply": {"category": "Shopping", "subcategory": None},
-        "Shopping": {"category": "Shopping", "subcategory": None},
-        "Sport Shop": {"category": "Shopping", "subcategory": None},
-        "Tobacco Smoking Related Store": {"category": "Shopping", "subcategory": None},
-        # Entertainment & Leisure
-        "Amusement Park": {"category": "Entertainment", "subcategory": None},
-        "Leisure Activities": {"category": "Entertainment", "subcategory": None},
-        "Sport": {"category": "Hobbies", "subcategory": None},
-        "Theatre/Opera/Orchestra/Ballet": {
-            "category": "Entertainment",
-            "subcategory": "Concerts",
-        },
-        # Services
-        "Hairdresser": {"category": "Beauty & Health", "subcategory": "Beauty"},
-        "Hotel": {"category": "Travel", "subcategory": None},
-        # Transportation
-        "Public Transport": {"category": "Transit", "subcategory": None},
-        "Taxi": {"category": "Transit", "subcategory": None},
-        # Education
-        "School": {"category": "Bills & Fees", "subcategory": None},
+        # Viseca specific categories
+        "Bakery": CategoryMapping(category=Category.DINING),
+        "Bar/Club": CategoryMapping(category=Category.LEISURE),
+        "Canteen": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        "Book Shop": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
+        "Office Supply": CategoryMapping(category=Category.SHOPPING),
+        "Sport Shop": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Tobacco Smoking Related Store": CategoryMapping(category=Category.SHOPPING),
+        "Amusement Park": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "Leisure Activities": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "Sport": CategoryMapping(category=Category.LEISURE),
+        "Theatre/Opera/Orchestra/Ballet": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Hairdresser": CategoryMapping(
+            category=Category.PERSONAL_CARE,
+            subcategory=PersonalCareSubcategory.PERSONAL,
+        ),
+        "School": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.FEES
+        ),
     }
 
     def __init__(
@@ -127,8 +65,10 @@ class VisecaProcessor(BaseTransactionProcessor):
         username: Optional[str] = None,
         password: Optional[str] = None,
         card_id: Optional[str] = None,
+        account: Optional[str] = None,
     ):
         super().__init__(name=name)
+        self.account_name = account or name
         # Override default column names for Viseca format
         self.merchant_column = "Name"
         self.merchant_category_column = "PFMCategoryName"
@@ -136,6 +76,7 @@ class VisecaProcessor(BaseTransactionProcessor):
         self.registered_category_column = (
             None  # Viseca doesn't have registered categories
         )
+
         self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
         self.set_category_mapper(
             self.SUGGESTED_MERCHANT_CATEGORY_MAPPING, self.merchant_category_column
@@ -158,9 +99,6 @@ class VisecaProcessor(BaseTransactionProcessor):
             raise ImportError(
                 "viseca package is not installed. Install it with: pip install cashewiss[viseca]"
             )
-
-        # Load environment variables from .env file
-        load_dotenv()
 
         # Initialize the Viseca client
         from viseca import VisecaClient
@@ -204,19 +142,19 @@ class VisecaProcessor(BaseTransactionProcessor):
 
         for row in self._df.iter_rows(named=True):
             # Map categories using the row data
-            mapped_categories = self._map_category(row)
-
+            mapping = self._map_category(row)
+            print(row, mapping)
             transaction = Transaction(
-                date=row["date"],
-                title=row["description"],
+                date=row["Date"],
+                title=row[self.merchant_column],
                 amount=-float(
-                    row["amount"]
+                    row["Amount"]
                 ),  # Negate amount since debit is positive in source
-                currency=row["currency"],
+                currency=row["Currency"],
                 notes=self.name,
-                category=mapped_categories["category"],
-                subcategory=mapped_categories["subcategory"],
-                account=self.name,
+                category=mapping.category,
+                subcategory=mapping.subcategory,
+                account=self.account_name,
                 meta={
                     "processor": self.name,
                     "original_merchant_category": row.get(

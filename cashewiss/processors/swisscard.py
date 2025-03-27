@@ -3,186 +3,117 @@ from typing import Optional, List
 import polars as pl
 
 from ..core.base import BaseTransactionProcessor, Transaction
+from ..core.models import CategoryMapping
+from ..core.enums import (
+    Category,
+    DiningSubcategory,
+    EssentialsSubcategory,
+    ShoppingSubcategory,
+    LeisureSubcategory,
+    BillsSubcategory,
+    PersonalCareSubcategory,
+    HouseholdSubcategory,
+)
 
 
 class SwisscardProcessor(BaseTransactionProcessor):
     """Processor for Swisscard credit card transactions."""
 
     SUGGESTED_MERCHANT_CATEGORY_MAPPING = {
-        "Auto": {"category": "Transit", "subcategory": None},
-        "Entertainment": {"category": "Entertainment", "subcategory": None},
-        "Family and Household": {"category": "House", "subcategory": None},
-        "Food and Drink": {"category": "Dining", "subcategory": None},
-        "Groceries": {"category": "Groceries", "subcategory": None},
-        "Health and Beauty": {"category": "Beauty & Health", "subcategory": None},
-        "Shopping": {"category": "Shopping", "subcategory": None},
-        "Travel": {"category": "Travel", "subcategory": None},
+        # Swisscard specific categories
+        "Auto": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "Family and Household": CategoryMapping(category=Category.HOUSEHOLD),
+        "Food and Drink": CategoryMapping(category=Category.DINING),
+        "Health and Beauty": CategoryMapping(category=Category.PERSONAL_CARE),
+        "Groceries": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "Entertainment": CategoryMapping(category=Category.LEISURE),
+        "Travel": CategoryMapping(category=Category.TRAVEL),
     }
 
     SUGGESTED_REGISTERED_CATEGORY_MAPPING = {
         # Shopping
-        "MEN & WOMEN'S CLOTHING": {"category": "Shopping", "subcategory": "Clothes"},
-        "SHOE STORES": {"category": "Shopping", "subcategory": "Clothes"},
-        "SPORTING GOODS STORES": {"category": "Shopping", "subcategory": "Clothes"},
-        "CATALOG MERCHANTS": {
-            "category": "Shopping",
-            "subcategory": "Clothes",  # Default to clothes for catalog merchants
-        },
-        "DUTY FREE STORES": {"category": "Shopping", "subcategory": None},
-        "LEATHER GOODS AND LUGGAGE STORES": {
-            "category": "Shopping",
-            "subcategory": "Clothes",
-        },
+        "MEN & WOMEN'S CLOTHING": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "SHOE STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "SPORTING GOODS STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "CATALOG MERCHANTS": CategoryMapping(category=Category.SHOPPING),
+        "DUTY FREE STORES": CategoryMapping(category=Category.SHOPPING),
+        "LEATHER GOODS AND LUGGAGE STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
         # Restaurant Dining
-        "EATING PLACES, RESTAURANTS": {
-            "category": "Dining",
-            "subcategory": "Friends & Co",  # Default to Friends & Co
-        },
-        "FAST FOOD RESTAURANTS": {"category": "Dining", "subcategory": "Delivery"},
-        "BARS, LOUNGES": {"category": "Dining", "subcategory": "Friends & Co"},
+        "EATING PLACES, RESTAURANTS": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "FAST FOOD RESTAURANTS": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "BARS, LOUNGES": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
         # Groceries
-        "GROCERY STORES, SUPERMARKETS": {
-            "category": "Groceries",
-            "subcategory": "Meal",
-        },
-        "MISCELLANEOUS FOOD STORES, MARKETS": {
-            "category": "Groceries",
-            "subcategory": "Meal",
-        },
+        "GROCERY STORES, SUPERMARKETS": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "MISCELLANEOUS FOOD STORES, MARKETS": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
         # Transit and Travel
-        "LODGING NOT SPECIFIED": {"category": "Travel", "subcategory": None},
-        "PASSENGER RAILWAYS": {"category": "Transit", "subcategory": None},
-        "AUTOMOBILE RENTAL": {"category": "Transit", "subcategory": None},
-        "TRANSPORTATION SERVICES, NOT SPECIFIED": {
-            "category": "Transit",
-            "subcategory": None,
-        },
+        "LODGING NOT SPECIFIED": CategoryMapping(category=Category.TRAVEL),
+        "PASSENGER RAILWAYS": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "AUTOMOBILE RENTAL": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "TRANSPORTATION SERVICES, NOT SPECIFIED": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
         # Entertainment
-        "AMUSEMENT AND RECREATION SERVICES": {
-            "category": "Entertainment",
-            "subcategory": None,
-        },
-        "DIGITAL GOODS - MEDIA, BOOKS, MOVIES, MUSIC": {
-            "category": "Entertainment",
-            "subcategory": None,
-        },
+        "AMUSEMENT AND RECREATION SERVICES": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "DIGITAL GOODS - MEDIA, BOOKS, MOVIES, MUSIC": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
         # Game stores
-        "GAME, TOY, AND HOBBY STORES": {"category": "Shopping", "subcategory": "Games"},
+        "GAME, TOY, AND HOBBY STORES": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
         # Health and Beauty
-        "DRUG STORES and Pharmacies": {
-            "category": "Beauty & Health",
-            "subcategory": "Health",
-        },
-        "BARBER AND BEAUTY SHOPS": {
-            "category": "Beauty & Health",
-            "subcategory": "Beauty",
-        },
-        "DENTAL, HOSPITAL, LAB EQUIPMENT AND SUPPLIES": {
-            "category": "Beauty & Health",
-            "subcategory": "Health",
-        },
+        "DRUG STORES and Pharmacies": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "BARBER AND BEAUTY SHOPS": CategoryMapping(
+            category=Category.PERSONAL_CARE,
+            subcategory=PersonalCareSubcategory.PERSONAL,
+        ),
+        "DENTAL, HOSPITAL, LAB EQUIPMENT AND SUPPLIES": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
         # Bills & Fees
-        "TELECOMMUNICATION SERVICE": {
-            "category": "Bills & Fees",
-            "subcategory": "Telecom",
-        },
+        "TELECOMMUNICATION SERVICE": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TELECOM
+        ),
+        # Household
+        "EQUIPMENT, FURNITURE STORES": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.FURNITURE
+        ),
     }
 
-    SUGGESTED_MERCHANT_MAPPING = {
-        # Groceries
-        "Coop": {"category": "Groceries", "subcategory": None},
-        "Coop Pronto": {"category": "Groceries", "subcategory": "Snacks"},
-        "Coop City": {"category": "Groceries", "subcategory": None},
-        "Migros": {"category": "Groceries", "subcategory": None},
-        "Denner": {"category": "Groceries", "subcategory": None},
-        "Lidl": {"category": "Groceries", "subcategory": None},
-        "k kiosk": {"category": "Groceries", "subcategory": "Snacks"},
-        "Selecta": {"category": "Groceries", "subcategory": "Snacks"},
-        # Dining - Restaurants
-        "Holy Cow!": {"category": "Dining", "subcategory": "Friends & Co"},
-        "GIRO DITALIA": {"category": "Dining", "subcategory": "Friends & Co"},
-        "La Penisola": {"category": "Dining", "subcategory": "Friends & Co"},
-        "La Penisola 3 Puls 5": {"category": "Dining", "subcategory": "Friends & Co"},
-        "La Piadina": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Marché": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Peking Garden": {"category": "Dining", "subcategory": "Friends & Co"},
-        "RESTAURANT PEKING GARDEN": {
-            "category": "Dining",
-            "subcategory": "Friends & Co",
-        },
-        "RISTORANTE GALLO D'ORO": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Restaurant EAU": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Rice Up!": {"category": "Dining", "subcategory": "Work"},
-        "Ristorante Toscano": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Sapori D'Italia": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Tokyo Tapas Markthalle": {"category": "Dining", "subcategory": "Friends & Co"},
-        "GASTRO TECHNOPARK ZH": {"category": "Dining", "subcategory": "Work"},
-        # Dining - Delivery
-        "McDonald's": {"category": "Dining", "subcategory": "Delivery"},
-        "Burger King": {"category": "Dining", "subcategory": "Delivery"},
-        "Subway": {"category": "Dining", "subcategory": "Delivery"},
-        "Too Good To Go": {"category": "Dining", "subcategory": "Delivery"},
-        "Uber Eats": {"category": "Dining", "subcategory": "Delivery"},
-        "Pizza Kurier Piratino": {"category": "Dining", "subcategory": "Delivery"},
-        # Dining - Bars
-        "Bar KIR ROYAL": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Kir Royal": {"category": "Dining", "subcategory": "Friends & Co"},
-        "FAT TONY BAR": {"category": "Dining", "subcategory": "Friends & Co"},
-        "El Lokal": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Oliver Twist Pub": {"category": "Dining", "subcategory": "Friends & Co"},
-        "Paddy Reilly's": {"category": "Dining", "subcategory": "Friends & Co"},
-        # House
-        "IKEA": {"category": "House", "subcategory": "Furniture"},
-        "XLCH AG": {"category": "House", "subcategory": "Furniture"},
-        # Shopping
-        "WOMO STORE": {"category": "Shopping", "subcategory": "Clothes"},
-        "Deichmann": {"category": "Shopping", "subcategory": "Clothes"},
-        "FREITAG Geroldstrasse": {"category": "Shopping", "subcategory": "Clothes"},
-        "Blue Tomato": {"category": "Shopping", "subcategory": "Clothes"},
-        "geschenkidee.ch": {"category": "Gifts", "subcategory": None},
-        "Sprüngli": {"category": "Groceries", "subcategory": "Snacks"},
-        # Beauty & Health
-        "Coop Vitality": {"category": "Beauty & Health", "subcategory": "Health"},
-        "Medbase Apotheke": {"category": "Beauty & Health", "subcategory": "Health"},
-        "Coiffeur 4 Jallki": {"category": "Beauty & Health", "subcategory": "Beauty"},
-        "Akademischer Sportverband Zürich": {
-            "category": "Beauty & Health",
-            "subcategory": "Health",
-        },
-        # Entertainment
-        "ZÜRICH OPENAIR": {"category": "Entertainment", "subcategory": "Concerts"},
-        "ZO Festival AG": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Ticketcorner": {"category": "Entertainment", "subcategory": "Concerts"},
-        "Sky": {"category": "Entertainment", "subcategory": None},
-        "Netflix": {"category": "Entertainment", "subcategory": None},
-        "Spotify": {"category": "Entertainment", "subcategory": None},
-        # Hobbies
-        "Google Cloud": {"category": "Hobbies", "subcategory": "Tech"},
-        "Salsarica": {"category": "Hobbies", "subcategory": "Salsa"},
-        "Boulderlounge": {"category": "Hobbies", "subcategory": "Bouldern"},
-        # Transit
-        "SBB CFF FFS": {"category": "Transit", "subcategory": None},
-        "ZVV": {"category": "Transit", "subcategory": None},
-        "HOTEL ALPINA": {"category": "Travel", "subcategory": None},
-        "Mobility": {"category": "Transit", "subcategory": None},
-        "GoMore": {"category": "Transit", "subcategory": None},
-        "WWW.GOMORE.CH": {"category": "Transit", "subcategory": None},
-        "PubliBike": {"category": "Transit", "subcategory": None},
-        "Uber": {"category": "Transit", "subcategory": None},
-        "Shell": {"category": "Transit", "subcategory": None},
-        "Socar": {"category": "Transit", "subcategory": None},
-        # Bills & Fees
-        "Google": {"category": "Bills & Fees", "subcategory": "Telecom"},
-        # Work
-        "Swiss Post": {"category": "Work", "subcategory": None},
-        "UPS_CH": {"category": "Work", "subcategory": None},
-        "PRINTFUL, INC.": {"category": "Work", "subcategory": None},
-        "Printful": {"category": "Work", "subcategory": None},
-    }
-
-    def __init__(self, name: str = "SwissCard"):
+    def __init__(self, name: str = "SwissCard", account: Optional[str] = None):
         # Set both category and merchant mappings by default
         super().__init__(name=name)
+        self.account_name = account or name
         # Override default column names for Swisscard format
         self.merchant_column = "Merchant"
         self.merchant_category_column = "Merchant Category"
@@ -194,7 +125,6 @@ class SwisscardProcessor(BaseTransactionProcessor):
         self.set_category_mapper(
             self.SUGGESTED_REGISTERED_CATEGORY_MAPPING, self.registered_category_column
         )
-        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
 
     def load_data(
         self,
@@ -248,7 +178,7 @@ class SwisscardProcessor(BaseTransactionProcessor):
                 continue
 
             # Map categories using the row data
-            mapped_categories = self._map_category(row)
+            mapping = self._map_category(row)
 
             transaction = Transaction(
                 date=row["Transaction date"],
@@ -258,9 +188,9 @@ class SwisscardProcessor(BaseTransactionProcessor):
                 ),  # Negate amount since debit is positive in source
                 currency=row["Currency"],
                 notes=self.name,
-                category=mapped_categories["category"],
-                subcategory=mapped_categories["subcategory"],
-                account="Sanzio",
+                category=mapping.category,
+                subcategory=mapping.subcategory,
+                account=self.account_name,
                 meta={
                     "processor": self.name,
                     "card_number": row["Card number"],
