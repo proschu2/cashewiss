@@ -155,9 +155,23 @@ def process(
     try:
         # Parse dates if provided
         from_date = (
-            datetime.strptime(date_from, "%Y-%m-%d").date() if date_from else None
+            (
+                datetime.strptime(date_from, "%Y-%m-%d").date()
+                if isinstance(date_from, str)
+                else date_from
+            )
+            if date_from
+            else None
         )
-        to_date = datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else None
+        to_date = (
+            (
+                datetime.strptime(date_to, "%Y-%m-%d").date()
+                if isinstance(date_to, str)
+                else date_to
+            )
+            if date_to
+            else None
+        )
 
         # Initialize processor with custom name, account and default category mappings
         if processor == "swisscard":

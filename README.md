@@ -18,6 +18,7 @@ A Python library for processing and uploading transactions from Swiss financial 
 ```bash
 uv pip install cashewiss  # Basic installation
 uv pip install 'cashewiss[viseca]'  # With Viseca support
+uv pip install 'cashewiss[streamlit]'  # With Streamlit UI support
 ```
 
 Or install in development mode:
@@ -61,6 +62,22 @@ cashewiss process --processor viseca
 
 # Show available category mappings
 cashewiss categories
+
+# Launch Streamlit UI
+cashewiss ui (wip)
+```
+
+### Streamlit Interface
+
+A web-based interface is available through Streamlit, providing a user-friendly way to:
+- Upload and process transaction files
+- Preview transaction data before export
+- Configure date ranges and processing options
+- Export to CSV or directly to Cashew
+
+To use the Streamlit interface, run:
+```bash
+cashewiss ui
 ```
 
 When using the Viseca processor, configure credentials in a .env file:

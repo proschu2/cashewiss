@@ -119,6 +119,11 @@ class SwisscardProcessor(BaseTransactionProcessor):
         self.merchant_category_column = "Merchant Category"
         self.description_column = "Description"
         self.registered_category_column = "Registered Category"
+
+        # Set up all mappings
+        self.set_category_mapper(
+            self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column
+        )  # From base class
         self.set_category_mapper(
             self.SUGGESTED_MERCHANT_CATEGORY_MAPPING, self.merchant_category_column
         )

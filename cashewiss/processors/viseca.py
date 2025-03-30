@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 import importlib.util
 import os
 from typing import Optional, List
@@ -12,23 +12,24 @@ from ..core.models import CategoryMapping
 from ..core.enums import (
     Category,
     DiningSubcategory,
+    EssentialsSubcategory,
     ShoppingSubcategory,
     LeisureSubcategory,
     BillsSubcategory,
     PersonalCareSubcategory,
+    TravelSubcategory,
 )
 
 
 class VisecaProcessor(BaseTransactionProcessor):
     """Processor for Viseca credit card transactions."""
 
-    # Empty since merchant mappings are now in base class
-    SUGGESTED_MERCHANT_MAPPING = {}
-
     SUGGESTED_MERCHANT_CATEGORY_MAPPING = {
         # Viseca specific categories
         "Bakery": CategoryMapping(category=Category.DINING),
-        "Bar/Club": CategoryMapping(category=Category.LEISURE),
+        "Bar/Club": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
         "Canteen": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.WORK
         ),
@@ -56,6 +57,32 @@ class VisecaProcessor(BaseTransactionProcessor):
         ),
         "School": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.FEES
+        ),
+        "Restaurant": CategoryMapping(category=Category.DINING),
+        "Supermarket": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "Shopping": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "Fast Food Restaurant": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "Hotel": CategoryMapping(
+            category=Category.TRAVEL, subcategory=TravelSubcategory.ACCOMMODATION
+        ),
+        "Music Festival/concert": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "Cosmetic/Perfumery": CategoryMapping(
+            category=Category.PERSONAL_CARE,
+            subcategory=PersonalCareSubcategory.PERSONAL,
+        ),
+        "Electronics": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "Taxi": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
         ),
     }
 
@@ -103,7 +130,10 @@ class VisecaProcessor(BaseTransactionProcessor):
         # Initialize the Viseca client
         from viseca import VisecaClient
 
-        self._client = VisecaClient(self._username, self._password)
+        try:
+            self._client = VisecaClient(self._username, self._password)
+        except Exception as e:
+            raise ValueError(f"Failed to initialize Viseca client: {str(e)}")
 
     def load_data(
         self,
@@ -113,25 +143,60 @@ class VisecaProcessor(BaseTransactionProcessor):
     ) -> pl.DataFrame:
         """
         Load Viseca transaction data using the Viseca API.
-        Note: file_path is ignored as data is fetched directly from the API.
+        Note: file_path is kept for compatibility with BaseTransactionProcessor but is ignored.
+
+        Args:
+            file_path: Ignored. Data is always fetched from the Viseca API.
+            date_from: Optional start date for filtering transactions
+            date_to: Optional end date for filtering transactions
+
+        Returns:
+            A Polars DataFrame containing the transaction data
         """
-        # Fetch transactions from Viseca API
         from viseca import format_transactions
 
-        transactions = self._client.list_transactions(self._card_id)
-        df = format_transactions(transactions)
+        # Convert date objects to datetime if they are strings, otherwise keep as is
+        date_from_dt = (
+            datetime.strptime(date_from, "%Y-%m-%d")
+            if isinstance(date_from, str)
+            else date_from
+            if date_from is not None
+            else None
+        )
+        date_to_dt = (
+            datetime.strptime(date_to, "%Y-%m-%d")
+            if isinstance(date_to, str)
+            else date_to
+            if date_to is not None
+            else None
+        )
 
-        # Convert to Polars DataFrame
-        df = pl.DataFrame(df)
+        all_transactions = []
+        offset = 0
+        page_size = 100
 
-        # Apply date filtering if provided
-        if date_from is not None:
-            df = df.filter(pl.col("date") >= date_from)
-        if date_to is not None:
-            df = df.filter(pl.col("date") <= date_to)
+        while True:
+            transactions = self._client.list_transactions(
+                self._card_id,
+                date_from=date_from_dt,
+                date_to=date_to_dt,
+                offset=offset,
+                page_size=page_size,
+            )
+            all_transactions.extend(transactions)
 
-        self._df = df
-        return df
+            if len(transactions) < page_size:
+                break
+
+            offset += page_size
+
+        df = format_transactions(all_transactions)
+        self._df = pl.DataFrame(df).filter(
+            (pl.col("PFMCategoryID") != "cv_not_categorized")
+            & (pl.col("Name") != "")
+            & (pl.col("Amount") > 0)
+        )
+        return self._df
 
     def transform_data(self) -> List[Transaction]:
         """Transform Viseca data into standardized Transaction objects."""
@@ -143,7 +208,6 @@ class VisecaProcessor(BaseTransactionProcessor):
         for row in self._df.iter_rows(named=True):
             # Map categories using the row data
             mapping = self._map_category(row)
-            print(row, mapping)
             transaction = Transaction(
                 date=row["Date"],
                 title=row[self.merchant_column],
