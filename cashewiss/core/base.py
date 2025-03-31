@@ -187,6 +187,15 @@ class BaseTransactionProcessor(ABC):
         "pub": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
         ),
+        "lokal": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "nelson": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "paddy's": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
         "mobility": CategoryMapping(
             category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
         ),
@@ -205,7 +214,7 @@ class BaseTransactionProcessor(ABC):
         "zürich openair": CategoryMapping(
             category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
         ),
-        "hallenstadion zürich": CategoryMapping(
+        "hallenstadion": CategoryMapping(
             category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
         ),
         "gomore.ch": CategoryMapping(
@@ -259,6 +268,27 @@ class BaseTransactionProcessor(ABC):
         ),
         "microsoft": CategoryMapping(
             category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
+        "home 24": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.DECOR
+        ),
+        "just eat": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        "swiss": CategoryMapping(
+            category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
+        ),
+        "easyjet": CategoryMapping(
+            category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
+        ),
+        "bitwarden.com": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
+        ),
+        "xlch": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.FURNITURE
+        ),
+        "aliexpress": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
         ),
     }
 

@@ -324,7 +324,8 @@ def display_transactions(transactions):
                 ],
                 source="Streamlit App",
             )
-            url = client.upload_transactions(batch)
+            url = client.export_to_api(batch)
+            print(url)
             st.markdown(f"[Open in Cashew]({url})")
 
 
