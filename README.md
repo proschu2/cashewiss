@@ -39,6 +39,9 @@ Process transactions from the command line:
 # Process transactions from a Swisscard XLSX file (default: CSV export)
 cashewiss process transactions.xlsx --output output.csv
 
+# Process Migros Bank transactions
+cashewiss process transactions.csv --processor migros --output output.csv
+
 # Export as CSV with custom settings
 cashewiss process transactions.xlsx --output output.csv --date-from 2024-01-01 --date-to 2024-03-23
 
@@ -64,7 +67,7 @@ cashewiss process --processor viseca
 cashewiss categories
 
 # Launch Streamlit UI
-cashewiss ui (wip)
+cashewiss ui
 ```
 
 ### Streamlit Interface
@@ -91,15 +94,15 @@ VISECA_CARD_ID=your_card_id
 
 ```python
 from datetime import date
-from cashewiss import SwisscardProcessor, CashewClient
+from cashewiss import SwisscardProcessor, MigrosProcessor, CashewClient
 
 # Initialize the processor and client
-processor = SwisscardProcessor()
+processor = SwisscardProcessor()  # or MigrosProcessor()
 client = CashewClient()
 
 # Process transactions with optional date filtering
 batch = processor.process(
-    "transactions.xlsx",
+    "transactions.xlsx",  # or "transactions.csv" for Migros Bank
     date_from=date(2024, 1, 1),
     date_to=date(2024, 3, 23)
 )
@@ -130,6 +133,27 @@ Fields:
 - Title: Transaction description
 - Note: Additional notes (optional)
 - Account: Account name (optional)
+
+### Migros Bank CSV Format
+
+The Migros Bank processor expects CSV files with the following format:
+- Semicolon (;) separated values
+- Header starts at row 14
+- Required columns:
+  - Datum: Transaction date
+  - Buchungstext: Transaction description
+  - Mitteilung: Additional message (used for notes)
+  - Referenznummer: Reference number
+  - Betrag: Amount (in Swiss format, e.g. -12,32)
+  - Saldo: Balance
+  - Valuta: Value date
+
+Special processing:
+- Title is extracted as everything before the first comma in Buchungstext
+- Content from Mitteilung field is added to transaction notes
+- Automatic filtering of:
+  - Viseca card entries (containing "Karte: 474124*****")
+  - TWINT entries containing "+417"
 
 ### Category Mapping
 
@@ -216,6 +240,7 @@ Currently supported financial institutions:
 
 - Swisscard (XLSX format)
 - Viseca (API access)
+- Migros Bank (CSV format)
 
 ## Contributing
 

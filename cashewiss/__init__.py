@@ -26,6 +26,7 @@ from .core.enums import (
 from .core.client import CashewClient
 from .processors.swisscard import SwisscardProcessor
 from .processors.viseca import VisecaProcessor
+from .processors.migros import MigrosProcessor
 
 __version__ = "0.1.0"
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "CashewClient",
     "SwisscardProcessor",
     "VisecaProcessor",
+    "MigrosProcessor",
     # Category Enums
     "Category",
     "IncomeSubcategory",

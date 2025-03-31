@@ -3,7 +3,14 @@ import plotly.express as px
 from datetime import date, timedelta
 import pandas as pd
 
-from cashewiss import SwisscardProcessor, VisecaProcessor, Category
+from cashewiss import (
+    SwisscardProcessor,
+    VisecaProcessor,
+    MigrosProcessor,
+    Category,
+    TransactionBatch,
+    Transaction,
+)
 
 st.set_page_config(
     page_title="Cashewiss - Swiss Card Transaction Processor",
@@ -18,13 +25,15 @@ def main():
     Process your credit card transactions from Swiss financial institutions and integrate them with the Cashew budget app.
     
     ### Features
-    - Process transactions from Viseca and Swisscard
+    - Process transactions from Viseca, Swisscard, and Migros Bank
     - Automatic category mapping
     - Export to CSV or directly to Cashew
     - Transaction analytics and visualizations
     """)
 
-    processor_type = st.sidebar.selectbox("Select Processor", ["Viseca", "Swisscard"])
+    processor_type = st.sidebar.selectbox(
+        "Select Processor", ["Viseca", "Swisscard", "Migros Bank"]
+    )
 
     # Date range selector in sidebar
     st.sidebar.header("Date Range")
@@ -39,6 +48,8 @@ def main():
 
     if processor_type == "Viseca":
         process_viseca(date_from, date_to)
+    elif processor_type == "Migros Bank":
+        process_migros(date_from, date_to)
     else:
         process_swisscard(date_from, date_to)
 
@@ -116,6 +127,55 @@ def process_viseca(date_from: date, date_to: date):
                 # Process transactions
                 batch = processor.process(
                     None,  # No file needed for Viseca
+                    date_from=date_from,
+                    date_to=date_to,
+                )
+
+                display_transactions(batch.transactions)
+
+        except Exception as e:
+            st.error(f"Error processing transactions: {str(e)}")
+
+
+def process_migros(date_from: date, date_to: date):
+    """Handle Migros Bank transaction processing."""
+    st.header("Migros Bank Transaction Processing")
+
+    st.info("""
+    ℹ️ Expected CSV format:
+    - Semicolon (;) separated values
+    - Header starts at row 14
+    - Required columns: Datum, Buchungstext, Mitteilung, Referenznummer, Betrag, Saldo, Valuta
+    - Amounts in Swiss format (e.g. -12,32)
+
+    Note: The processor automatically filters out:
+    - Viseca card entries (containing "Karte: 474124*****")
+    - TWINT entries containing "+417"
+    """)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        uploaded_file = st.file_uploader("Upload Migros Bank CSV file", type=["csv"])
+
+    with col2:
+        account_name = st.text_input(
+            "Account Name (for categorization)", key="migros_account"
+        )
+        provider_name = st.text_input(
+            "Provider Name (will be added to all transactions)",
+            key="migros_notes",
+            value="Migros Bank",
+        )
+
+    if uploaded_file:
+        try:
+            with st.spinner("Processing transactions..."):
+                processor = MigrosProcessor(name=provider_name, account=account_name)
+
+                # Process transactions
+                batch = processor.process(
+                    uploaded_file,
                     date_from=date_from,
                     date_to=date_to,
                 )
@@ -226,17 +286,6 @@ def display_transactions(transactions):
         avg_transaction = filtered_df["Amount"].mean()
         st.metric("Average Transaction", f"CHF {avg_transaction:,.2f}")
 
-    # # Category breakdown
-    # st.subheader("Spending by Category")
-    # category_totals = filtered_df.groupby("Category")["Amount"].sum().reset_index()
-    # fig = px.pie(
-    #     category_totals,
-    #     values="Amount",
-    #     names="Category",
-    #     title="Transaction Distribution by Category"
-    # )
-    # st.plotly_chart(fig)
-
     # Transaction timeline
     st.subheader("Transaction Timeline")
     daily_totals = filtered_df.groupby("Date")["Amount"].sum().reset_index()
@@ -305,9 +354,6 @@ def display_transactions(transactions):
             from cashewiss import CashewClient
 
             client = CashewClient()
-            # Convert back to TransactionBatch
-            from cashewiss import TransactionBatch, Transaction
-
             batch = TransactionBatch(
                 transactions=[
                     Transaction(
@@ -324,8 +370,7 @@ def display_transactions(transactions):
                 ],
                 source="Streamlit App",
             )
-            url = client.export_to_api(batch)
-            print(url)
+            url = client.export_to_api(batch, dry_run=True)
             st.markdown(f"[Open in Cashew]({url})")
 
 

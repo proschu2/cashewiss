@@ -11,6 +11,7 @@ from .enums import (
     DiningSubcategory,
     EssentialsSubcategory,
     HouseholdSubcategory,
+    IncomeSubcategory,
     ShoppingSubcategory,
     LeisureSubcategory,
     PersonalCareSubcategory,
@@ -211,7 +212,7 @@ class BaseTransactionProcessor(ABC):
         "uber eats": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
         ),
-        "zürich openair": CategoryMapping(
+        "openair": CategoryMapping(
             category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
         ),
         "hallenstadion": CategoryMapping(
@@ -220,7 +221,7 @@ class BaseTransactionProcessor(ABC):
         "gomore.ch": CategoryMapping(
             category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
         ),
-        "helvetia versicherungen": CategoryMapping(
+        "helvetia": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
         ),
         "jumbo": CategoryMapping(
@@ -290,6 +291,28 @@ class BaseTransactionProcessor(ABC):
         "aliexpress": CategoryMapping(
             category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
         ),
+        "sunrise": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TELECOM
+        ),
+        "elektrizitätswerk": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.UTILITIES
+        ),
+        "salär": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.CLEANING
+        ),
+        "baugenossenschaft": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.RENT
+        ),
+        "serafe": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.UTILITIES
+        ),
+        "touring": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
+        ),
+        "mensile": CategoryMapping(category=Category.INCOME),
+        "sva": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
+        ),
     }
 
     def __init__(self, name: str):
@@ -306,6 +329,15 @@ class BaseTransactionProcessor(ABC):
         self.registered_category_column: str = "Registered Category"
 
         # Initialize base mappings with shared merchant mappings
+        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
+
+    def set_default_merchant_mapping(self):
+        """
+        Set default merchant mapping for the processor.
+
+        This method should be overridden by subclasses to provide specific
+        merchant mappings.
+        """
         self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
 
     def set_category_mapper(

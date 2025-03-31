@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from cashewiss import (
     SwisscardProcessor,
     VisecaProcessor,
+    MigrosProcessor,
     CashewClient,
     CategoryMapping,
     Category,
@@ -20,7 +21,6 @@ from cashewiss import (
     HouseholdSubcategory,
     HobbiesSubcategory,
 )
-
 
 def setup_category_mapper() -> Dict[str, CategoryMapping]:
     """Create and configure the default category mapper for merchant categories"""
@@ -91,13 +91,11 @@ def setup_category_mapper() -> Dict[str, CategoryMapping]:
     }
     return default_mappings
 
-
 @click.group()
 def main():
     """Cashewiss - Process Swiss financial transactions for Cashew budget app"""
     load_dotenv()
     pass
-
 
 @main.command()
 @click.argument("file_path", type=click.Path(exists=True), required=False)
@@ -130,7 +128,7 @@ def main():
 )
 @click.option(
     "--processor",
-    type=click.Choice(["swisscard", "viseca"]),
+    type=click.Choice(["swisscard", "viseca", "migros"]),
     default="swisscard",
     help="Processor to use (default: swisscard)",
 )
@@ -151,7 +149,7 @@ def process(
     processor: str,
     dry_run: bool,
 ):
-    """Process transactions from a Swisscard XLSX file or Viseca API"""
+    """Process transactions from a Swisscard XLSX file, Viseca API, or Migros Bank CSV"""
     try:
         # Parse dates if provided
         from_date = (
@@ -178,6 +176,10 @@ def process(
             if not file_path:
                 raise click.UsageError("file_path is required for Swisscard processor")
             processor_instance = SwisscardProcessor(name=name, account=account)
+        elif processor == "migros":
+            if not file_path:
+                raise click.UsageError("file_path is required for Migros Bank processor")
+            processor_instance = MigrosProcessor(name=name, account=account)
         else:  # viseca
             if importlib.util.find_spec("viseca") is None:
                 raise click.UsageError(
@@ -267,7 +269,6 @@ def process(
     except Exception as e:
         click.echo(f"Error processing transactions: {str(e)}", err=True)
 
-
 @main.command()
 def categories():
     """Show available category mappings"""
@@ -279,7 +280,6 @@ def categories():
             f" -> {mapping.subcategory.value}" if mapping.subcategory else ""
         )
         click.echo(f"{merchant_category}: {mapping.category.value}{subcategory_str}")
-
 
 if __name__ == "__main__":
     main()
