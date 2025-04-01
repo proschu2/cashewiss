@@ -97,7 +97,7 @@ class CashewClient:
         return f"{self.base_url}{endpoint}?{query_string}"
 
     def _split_batch(
-        self, transactions: List[Transaction], max_size: int = 25
+        self, transactions: List[Transaction], max_size: int = 10
     ) -> List[List[Transaction]]:
         """Split transactions into smaller batches to handle URL length limits."""
         return [

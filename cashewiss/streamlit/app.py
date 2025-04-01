@@ -1,3 +1,4 @@
+from pathlib import Path
 import streamlit as st
 import plotly.express as px
 from datetime import date, timedelta
@@ -11,16 +12,18 @@ from cashewiss import (
     TransactionBatch,
     Transaction,
 )
+from cashewiss.core.models import SUBCATEGORY_TYPES
 
 st.set_page_config(
     page_title="Cashewiss - Swiss Card Transaction Processor",
-    page_icon="💳",
+    page_icon=":currency_exchange:",
     layout="wide",
 )
 
 
 def main():
-    st.title("Cashewiss - Swiss Card Transaction Processor 💳")
+    st.title("Cashewiss - Swiss Card Transaction Processor")
+
     st.markdown("""
     Process your credit card transactions from Swiss financial institutions and integrate them with the Cashew budget app.
     
@@ -310,6 +313,7 @@ def display_transactions(transactions):
     st.dataframe(
         filtered_df,
         hide_index=True,
+        use_container_width=True,
         column_config={
             "Amount": st.column_config.NumberColumn(
                 "Amount", format="CHF %.2f", help="Transaction amount"
@@ -340,38 +344,106 @@ def display_transactions(transactions):
 
     # Export options
     st.subheader("Export Options")
-    col1, col2 = st.columns(2)
 
-    with col1:
-        if st.button("Export to CSV"):
-            csv = filtered_df.to_csv(index=False)
-            st.download_button(
-                "Download CSV", csv, "transactions.csv", "text/csv", key="download-csv"
+    if st.button("Export to CSV"):
+        csv = filtered_df.to_csv(index=False)
+        st.download_button(
+            "Download CSV", csv, "transactions.csv", "text/csv", key="download-csv"
+        )
+
+    st.write("")  # Add spacing between buttons
+
+    if st.button("Export to Cashew"):
+        from cashewiss import CashewClient
+
+        # Debug information
+        st.write(f"Total entries in filtered_df: {len(filtered_df)}")
+        valid_transactions = []
+
+        for idx, row in filtered_df.iterrows():
+            try:
+                category = Category(row["Category"]) if row["Category"] else None
+                subcategory = None
+                if category and row["Subcategory"]:
+                    subcategory_type = SUBCATEGORY_TYPES.get(category)
+                    if subcategory_type:
+                        subcategory = subcategory_type(row["Subcategory"])
+
+                transaction = Transaction(
+                    amount=row["Amount"],
+                    title=row["Title"],
+                    date=row["Date"],
+                    currency=row["Currency"],
+                    category=category,
+                    subcategory=subcategory,
+                    account=row["Account"],
+                    notes=row["Notes"],
+                )
+                valid_transactions.append(transaction)
+            except Exception as e:
+                st.error(
+                    f"❌ Error with transaction {idx + 1} ({row['Title']}): {str(e)}"
+                )
+
+        st.write(
+            f"Successfully validated transactions: {len(valid_transactions)} of {len(filtered_df)}"
+        )
+
+        if not valid_transactions:
+            st.error("No valid transactions to export")
+            return
+
+        client = CashewClient()
+
+        # Process transactions in batches of 5
+        batch_size = 10
+        st.write(
+            f"Processing {len(valid_transactions)} transactions in batches of {batch_size}..."
+        )
+
+        # Initialize session state for checkboxes if not exists
+        if "processed_batches" not in st.session_state:
+            st.session_state.processed_batches = {}
+
+        # Prepare batch data
+        batch_data = []
+        for i in range(0, len(valid_transactions), batch_size):
+            batch_transactions = valid_transactions[i : i + batch_size]
+            current_batch = TransactionBatch(
+                transactions=batch_transactions, source="Streamlit App"
             )
 
-    with col2:
-        if st.button("Export to Cashew"):
-            from cashewiss import CashewClient
+            batch_num = i // batch_size + 1
+            batch_id = f"batch_{batch_num}"
 
-            client = CashewClient()
-            batch = TransactionBatch(
-                transactions=[
-                    Transaction(
-                        amount=row["Amount"],
-                        title=row["Title"],
-                        date=row["Date"],
-                        currency=row["Currency"],
-                        category=Category(row["Category"]) if row["Category"] else None,
-                        subcategory=row["Subcategory"],
-                        account=row["Account"],
-                        notes=row["Notes"],
-                    )
-                    for _, row in filtered_df.iterrows()
-                ],
-                source="Streamlit App",
-            )
-            url = client.export_to_api(batch, dry_run=True)
-            st.markdown(f"[Open in Cashew]({url})")
+            try:
+                url = client.export_to_api(current_batch, dry_run=True)
+                status = "✓ Success"
+                batch_data.append(
+                    {
+                        "Batch": f"Batch {batch_num}",
+                        "Transactions": len(batch_transactions),
+                        "Status": status,
+                        "URL": url,
+                        "ID": batch_id,
+                    }
+                )
+            except Exception as e:
+                st.error(f"❌ Error processing batch {batch_num}: {str(e)}")
+
+        # Display batch table
+        if batch_data:
+            st.write("### Batch Export Status")
+            
+            # Display batches with direct links
+            for batch in batch_data:
+                col1, col2, col3 = st.columns([1, 1, 3])
+                with col1:
+                    st.write(f"{batch['Batch']}")
+                with col2:
+                    st.write(f"{batch['Transactions']} transactions")
+                with col3:
+                    st.markdown(f"[Open in Cashew]({batch['URL']})")
 
 
 if __name__ == "__main__":

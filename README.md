@@ -1,3 +1,5 @@
+<img src="assets/logo.png" alt="Cashewiss Logo" width="200"/>
+
 # Cashewiss
 
 A Python library for processing and uploading transactions from Swiss financial institutions to the Cashew budget app.
