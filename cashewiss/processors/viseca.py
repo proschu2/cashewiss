@@ -103,7 +103,7 @@ class VisecaProcessor(BaseTransactionProcessor):
         self.registered_category_column = (
             None  # Viseca doesn't have registered categories
         )
-        self.set_default_merchant_mappings()
+        self.set_default_merchant_mapping()
         self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
         self.set_category_mapper(
             self.SUGGESTED_MERCHANT_CATEGORY_MAPPING, self.merchant_category_column
