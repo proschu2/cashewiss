@@ -78,7 +78,12 @@ def process_viseca(date_from: date, date_to: date):
         )
 
         submit = st.form_submit_button("Process Transactions")
-
+        st.warning("""
+                ⚠️ **Important: Viseca One App Required**
+                
+                This integration requires you to have the Viseca One mobile app installed and set up.
+                The app is necessary for authentication and accessing your transaction data.
+                """)
     if submit:
         if not all([username, password, card_id]):
             st.error("Please fill in all credentials")
@@ -120,13 +125,6 @@ def process_viseca(date_from: date, date_to: date):
         try:
             processor = st.session_state.viseca_processor
             with st.spinner("Processing transactions..."):
-                st.warning("""
-                ⚠️ **Important: Viseca One App Required**
-                
-                This integration requires you to have the Viseca One mobile app installed and set up.
-                The app is necessary for authentication and accessing your transaction data.
-                """)
-
                 # Process transactions
                 batch = processor.process(
                     None,  # No file needed for Viseca
@@ -152,7 +150,7 @@ def process_migros(date_from: date, date_to: date):
     - Amounts in Swiss format (e.g. -12,32)
 
     Note: The processor automatically filters out:
-    - Viseca card entries (containing "Karte: 474124*****")
+    - Viseca card entries (containing "Karte: 474124*****0910")
     - TWINT entries containing "+417"
     """)
 
@@ -345,105 +343,115 @@ def display_transactions(transactions):
     # Export options
     st.subheader("Export Options")
 
-    if st.button("Export to CSV"):
+    # Store filtered data in session state
+    st.session_state.filtered_transactions = filtered_df
+
+    col1, col2 = st.columns(2)
+
+    with col1:
         csv = filtered_df.to_csv(index=False)
         st.download_button(
-            "Download CSV", csv, "transactions.csv", "text/csv", key="download-csv"
+            "Export to CSV",
+            csv,
+            "transactions.csv",
+            "text/csv",
+            key="download-csv",
+            use_container_width=True,
         )
 
-    st.write("")  # Add spacing between buttons
+    with col2:
+        if st.button("Export to Cashew", key="export-cashew", use_container_width=True):
+            from cashewiss import CashewClient
 
-    if st.button("Export to Cashew"):
-        from cashewiss import CashewClient
+            # Use transactions from session state
+            stored_df = st.session_state.filtered_transactions
+            st.write(f"Total entries to process: {len(stored_df)}")
+            valid_transactions = []
 
-        # Debug information
-        st.write(f"Total entries in filtered_df: {len(filtered_df)}")
-        valid_transactions = []
+            for idx, row in stored_df.iterrows():
+                try:
+                    category = Category(row["Category"]) if row["Category"] else None
+                    subcategory = None
+                    if category and row["Subcategory"]:
+                        subcategory_type = SUBCATEGORY_TYPES.get(category)
+                        if subcategory_type:
+                            subcategory = subcategory_type(row["Subcategory"])
 
-        for idx, row in filtered_df.iterrows():
-            try:
-                category = Category(row["Category"]) if row["Category"] else None
-                subcategory = None
-                if category and row["Subcategory"]:
-                    subcategory_type = SUBCATEGORY_TYPES.get(category)
-                    if subcategory_type:
-                        subcategory = subcategory_type(row["Subcategory"])
+                    transaction = Transaction(
+                        amount=row["Amount"],
+                        title=row["Title"],
+                        date=row["Date"],
+                        currency=row["Currency"],
+                        category=category,
+                        subcategory=subcategory,
+                        account=row["Account"],
+                        notes=row["Notes"],
+                    )
+                    valid_transactions.append(transaction)
+                except Exception as e:
+                    st.error(
+                        f"❌ Error with transaction {idx + 1} ({row['Title']}): {str(e)}"
+                    )
 
-                transaction = Transaction(
-                    amount=row["Amount"],
-                    title=row["Title"],
-                    date=row["Date"],
-                    currency=row["Currency"],
-                    category=category,
-                    subcategory=subcategory,
-                    account=row["Account"],
-                    notes=row["Notes"],
-                )
-                valid_transactions.append(transaction)
-            except Exception as e:
-                st.error(
-                    f"❌ Error with transaction {idx + 1} ({row['Title']}): {str(e)}"
-                )
-
-        st.write(
-            f"Successfully validated transactions: {len(valid_transactions)} of {len(filtered_df)}"
-        )
-
-        if not valid_transactions:
-            st.error("No valid transactions to export")
-            return
-
-        client = CashewClient()
-
-        # Process transactions in batches of 5
-        batch_size = 10
-        st.write(
-            f"Processing {len(valid_transactions)} transactions in batches of {batch_size}..."
-        )
-
-        # Initialize session state for checkboxes if not exists
-        if "processed_batches" not in st.session_state:
-            st.session_state.processed_batches = {}
-
-        # Prepare batch data
-        batch_data = []
-        for i in range(0, len(valid_transactions), batch_size):
-            batch_transactions = valid_transactions[i : i + batch_size]
-            current_batch = TransactionBatch(
-                transactions=batch_transactions, source="Streamlit App"
+            st.write(
+                f"Successfully validated transactions: {len(valid_transactions)} of {len(filtered_df)}"
             )
 
-            batch_num = i // batch_size + 1
-            batch_id = f"batch_{batch_num}"
+            if not valid_transactions:
+                st.error("No valid transactions to export")
+                return
 
-            try:
-                url = client.export_to_api(current_batch, dry_run=True)
-                status = "✓ Success"
-                batch_data.append(
-                    {
-                        "Batch": f"Batch {batch_num}",
-                        "Transactions": len(batch_transactions),
-                        "Status": status,
-                        "URL": url,
-                        "ID": batch_id,
-                    }
+            client = CashewClient()
+
+            # Process transactions in batches of 5
+            batch_size = 10
+            st.write(
+                f"Processing {len(valid_transactions)} transactions in batches of {batch_size}..."
+            )
+
+            # Initialize session state for checkboxes if not exists
+            if "processed_batches" not in st.session_state:
+                st.session_state.processed_batches = {}
+
+            # Prepare batch data
+            batch_data = []
+            for i in range(0, len(valid_transactions), batch_size):
+                batch_transactions = valid_transactions[i : i + batch_size]
+                current_batch = TransactionBatch(
+                    transactions=batch_transactions, source="Streamlit App"
                 )
-            except Exception as e:
-                st.error(f"❌ Error processing batch {batch_num}: {str(e)}")
 
-        # Display batch table
-        if batch_data:
-            st.write("### Batch Export Status")
-            
-            # Display batches with direct links
-            for batch in batch_data:
-                col1, col2, col3 = st.columns([1, 1, 3])
-                with col1:
-                    st.write(f"{batch['Batch']}")
-                with col2:
-                    st.write(f"{batch['Transactions']} transactions")
-                with col3:
-                    st.markdown(f"[Open in Cashew]({batch['URL']})")
+                batch_num = i // batch_size + 1
+                batch_id = f"batch_{batch_num}"
+
+                try:
+                    url = client.export_to_api(current_batch, dry_run=True)
+                    status = "✓ Success"
+                    batch_data.append(
+                        {
+                            "Batch": f"Batch {batch_num}",
+                            "Transactions": len(batch_transactions),
+                            "Status": status,
+                            "URL": url,
+                            "ID": batch_id,
+                        }
+                    )
+                except Exception as e:
+                    st.error(f"❌ Error processing batch {batch_num}: {str(e)}")
+
+            # Display batch table
+            if batch_data:
+                st.write("### Batch Export Status")
+
+                # Display batches with direct links
+                for batch in batch_data:
+                    col1, col2, col3 = st.columns([1, 1, 3])
+                    with col1:
+                        st.write(f"{batch['Batch']}")
+                    with col2:
+                        st.write(f"{batch['Transactions']} transactions")
+                    with col3:
+                        st.markdown(f"[Open in Cashew]({batch['URL']})")
 
 
 if __name__ == "__main__":

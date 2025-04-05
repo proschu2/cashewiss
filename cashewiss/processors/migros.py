@@ -81,7 +81,6 @@ class MigrosProcessor(BaseTransactionProcessor):
 
         # Convert DataFrame to list of Transaction objects
         for row in self._df.iter_rows(named=True):
-            # Skip Viseca card entries
             if "Karte: 474124" in row["Buchungstext"]:
                 continue
 
@@ -91,7 +90,7 @@ class MigrosProcessor(BaseTransactionProcessor):
 
             # Get filtered buchungstext for merchant mapping
             merchant = row["Buchungstext"].split(",")[0]
-            
+
             # Further clean merchant text by removing TWINT prefix
             if "TWINT" in merchant:
                 # Handle cases like "TWINT Belastung IKEA AG 0400003132762475"
@@ -99,7 +98,6 @@ class MigrosProcessor(BaseTransactionProcessor):
                 if len(parts) > 1:
                     # Take everything after "TWINT Belastung" and before any numbers
                     merchant = parts[1].split(" 0")[0].strip()
-
 
             # Use Mitteilung as title if present, otherwise use filtered buchungstext
             title = row["Mitteilung"] if row["Mitteilung"] else merchant
