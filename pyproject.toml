@@ -42,7 +42,7 @@ dev = [
 
 [tool.black]
 line-length = 88
-target-version = ["py39"]
+target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
@@ -51,5 +51,6 @@ multi_line_output = 3
 [dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
+    "ipython>=8.36.0",
     "pre-commit>=4.2.0",
 ]

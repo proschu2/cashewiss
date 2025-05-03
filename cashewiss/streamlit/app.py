@@ -1,4 +1,3 @@
-from pathlib import Path
 import streamlit as st
 import plotly.express as px
 from datetime import date, timedelta
@@ -41,9 +40,10 @@ def main():
     # Date range selector in sidebar
     st.sidebar.header("Date Range")
     today = date.today()
-    default_start = today - timedelta(days=90)
+    default_end = today.replace(day=1) - timedelta(days=1)  # Last day of previous month
+    default_start = default_end.replace(day=1)  # First day of previous month
     date_from = st.sidebar.date_input("From", value=default_start)
-    date_to = st.sidebar.date_input("To", value=today)
+    date_to = st.sidebar.date_input("To", value=default_end)
 
     if date_from > date_to:
         st.error("Error: Start date must be before end date")

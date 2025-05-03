@@ -25,20 +25,46 @@ class MigrosProcessor(BaseTransactionProcessor):
 
         Expected CSV format:
         - Semicolon separated
-        - Header starts at row 14
+        - Header row contains 'Datum' as first column
         - Columns: Datum, Buchungstext, Mitteilung, Referenznummer, Betrag, Saldo, Valuta
         - Amount in Swiss format (e.g. -12,32)
         """
-        # Skip first 13 rows, header is on row 14
-        # Read CSV with Swiss date format (dd.mm.yyyy)
+        # First determine the header row by finding the row with 'Datum' as first column
+        header_row = 0
+
+        # Check if file_path is a string path or a file-like object
+        if hasattr(file_path, "read"):
+            # It's a file-like object (like Streamlit's UploadedFile)
+            # First, read all contents to find the header row
+            file_content = file_path.getvalue().decode("utf-8")
+            for i, line in enumerate(file_content.splitlines()):
+                if "Buchungstext" in line:
+                    print(line)
+                    header_row = i
+                    break
+                if line.strip().startswith('"Datum;"'):
+                    print(line)
+                    header_row = i
+                    break
+
+            # Now use read_csv with a file-like object
+            file_path.seek(0)
+        else:
+            # It's a path (string or PathLike)
+            with open(file_path, "r", encoding="utf8") as f:
+                for i, line in enumerate(f):
+                    if line.strip().startswith("Datum;"):
+                        header_row = i
+                        break
+
         df = pl.read_csv(
             file_path,
             separator=";",
-            skip_rows=13,
+            skip_rows=header_row,
             encoding="utf8",
             try_parse_dates=False,  # Don't auto-parse dates
+            truncate_ragged_lines=True,  # Handle inconsistent number of fields
         )
-
         # Convert Swiss date format to ISO
         df = df.with_columns(
             pl.col("Datum").str.strptime(pl.Date, format="%d.%m.%Y").alias("Datum")
