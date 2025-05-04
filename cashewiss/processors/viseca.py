@@ -191,11 +191,36 @@ class VisecaProcessor(BaseTransactionProcessor):
             offset += page_size
 
         df = format_transactions(all_transactions)
-        self._df = pl.DataFrame(df).filter(
-            (pl.col("PFMCategoryID") != "cv_not_categorized")
-            & (pl.col("Name") != "")
-            & (pl.col("Amount") > 0)
-        )
+
+        # Convert DataFrame to Polars
+        polars_df = pl.DataFrame(df)
+
+        # Check schema and apply appropriate filtering
+        schema = polars_df.schema
+
+        # Initialize filter expression with a condition that's always true
+        filter_expr = pl.lit(True)
+
+        # Add filter conditions based on data types in the schema
+        if "PFMCategoryID" in schema:
+            if schema["PFMCategoryID"] == pl.String:
+                filter_expr = filter_expr & (
+                    pl.col("PFMCategoryID") != "cv_not_categorized"
+                )
+
+        if "Name" in schema:
+            if schema["Name"] == pl.String:
+                filter_expr = filter_expr & (pl.col("Name") != "")
+
+        if "Amount" in schema:
+            if schema["Amount"] in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
+                filter_expr = filter_expr & (pl.col("Amount") > 0)
+            elif schema["Amount"] == pl.String:
+                # Convert string to float if Amount is stored as string
+                filter_expr = filter_expr & (pl.col("Amount").cast(pl.Float64) > 0)
+
+        # Apply the filters
+        self._df = polars_df.filter(filter_expr)
         return self._df
 
     def transform_data(self) -> List[Transaction]:
@@ -207,7 +232,15 @@ class VisecaProcessor(BaseTransactionProcessor):
 
         for row in self._df.iter_rows(named=True):
             # Map categories using the row data
-            mapping = self._map_category(row)
+            mapping = self._map_category(
+                {
+                    self.merchant_column: row[self.merchant_column],
+                    self.merchant_category_column: row.get(
+                        self.merchant_category_column
+                    ),
+                    self.amount_column: float(row["Amount"]),
+                }
+            )
             transaction = Transaction(
                 date=row["Date"],
                 title=row[self.merchant_column],

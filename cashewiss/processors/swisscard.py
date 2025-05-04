@@ -181,7 +181,20 @@ class SwisscardProcessor(BaseTransactionProcessor):
                 continue
 
             # Map categories using the row data
-            mapping = self._map_category(row)
+            # Ensure amount is included for categorization
+            mapping = self._map_category(
+                {
+                    self.merchant_column: row.get(self.merchant_column)
+                    or row[self.description_column],
+                    self.merchant_category_column: row.get(
+                        self.merchant_category_column
+                    ),
+                    self.registered_category_column: row.get(
+                        self.registered_category_column
+                    ),
+                    self.amount_column: float(row["Amount"]),
+                }
+            )
 
             transaction = Transaction(
                 date=row["Transaction date"],

@@ -12,6 +12,7 @@ class MigrosProcessor(BaseTransactionProcessor):
         super().__init__(name=name)
         self.account_name = account or name
         self.merchant_column = "Buchungstext"
+        self.amount_column = "Betrag"
         self.set_default_merchant_mapping()
 
     def load_data(
@@ -39,11 +40,9 @@ class MigrosProcessor(BaseTransactionProcessor):
             file_content = file_path.getvalue().decode("utf-8")
             for i, line in enumerate(file_content.splitlines()):
                 if "Buchungstext" in line:
-                    print(line)
                     header_row = i
                     break
                 if line.strip().startswith('"Datum;"'):
-                    print(line)
                     header_row = i
                     break
 
@@ -110,27 +109,30 @@ class MigrosProcessor(BaseTransactionProcessor):
             if "Karte: 474124" in row["Buchungstext"]:
                 continue
 
-            # Skip TWINT entries with +417
-            if "TWINT" in row["Buchungstext"] and "+417" in row["Buchungstext"]:
-                continue
-
             # Get filtered buchungstext for merchant mapping
             merchant = row["Buchungstext"].split(",")[0]
 
             # Further clean merchant text by removing TWINT prefix
             if "TWINT" in merchant:
-                # Handle cases like "TWINT Belastung IKEA AG 0400003132762475"
-                parts = merchant.split("TWINT Belastung ")
-                if len(parts) > 1:
-                    # Take everything after "TWINT Belastung" and before any numbers
-                    merchant = parts[1].split(" 0")[0].strip()
+                # Handle cases like TWINT and phone number
+                if "+417" in row["Buchungstext"]:
+                    person_name = row["Buchungstext"].split(",")[1].strip()
+                    merchant = f"TWINT {person_name}"
+                else:
+                    # Handle cases like "TWINT Belastung IKEA AG 0400003132762475"
+                    parts = merchant.split("TWINT Belastung ")
+                    if len(parts) > 1:
+                        # Take everything after "TWINT Belastung" and before any numbers
+                        merchant = parts[1].split(" 0")[0].strip()
 
             # Use Mitteilung as title if present, otherwise use filtered buchungstext
             title = row["Mitteilung"] if row["Mitteilung"] else merchant
             notes = self.name
 
             # Map categories using the merchant text
-            mapping = self._map_category({self.merchant_column: title})
+            mapping = self._map_category(
+                {self.merchant_column: title, "Betrag": float(row["Betrag"])}
+            )
 
             transaction = Transaction(
                 date=row["Datum"],

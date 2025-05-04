@@ -4,6 +4,7 @@ from enum import Enum
 class IncomeSubcategory(str, Enum):
     SALARY = "Salary"
     SIDE = "Side"
+    TWINT = "Twint"
 
 
 class BillsSubcategory(str, Enum):
@@ -26,6 +27,7 @@ class DiningSubcategory(str, Enum):
     DATE = "Date"
     DELIVERY = "Delivery"
     SOCIAL = "Social"
+    TWINT = "Twint"
 
 
 class ShoppingSubcategory(str, Enum):

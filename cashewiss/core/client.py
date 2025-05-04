@@ -140,7 +140,7 @@ class CashewClient:
         return None
 
     def export_to_api(
-        self, batch: TransactionBatch, dry_run: bool = False
+        self, batch: TransactionBatch, dry_run: bool = False, debug: bool = False
     ) -> Optional[str]:
         """
         Export transactions via Cashew API.
@@ -148,26 +148,110 @@ class CashewClient:
         Args:
             batch: TransactionBatch to export
             dry_run: If True, return URL instead of opening browser
+            debug: If True, print debug information
 
         Returns:
             URL string if dry_run=True, otherwise None
         """
+        import logging
+
+        # Setup logging if needed
+        if debug:
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s - %(levelname)s - %(message)s",
+                force=True,
+            )
+
+        logging.debug(f"Starting export of {len(batch.transactions)} transactions")
+
+        # Validate transactions before proceeding
+        for i, transaction in enumerate(batch.transactions):
+            try:
+                # Check for required fields
+                if not hasattr(transaction, "date") or transaction.date is None:
+                    logging.error(f"Transaction {i} missing date field")
+                    raise ValueError(f"Transaction {i} missing date field")
+
+                if not hasattr(transaction, "amount") or transaction.amount is None:
+                    logging.error(f"Transaction {i} missing amount field")
+                    raise ValueError(f"Transaction {i} missing amount field")
+
+                if not hasattr(transaction, "title") or not transaction.title:
+                    logging.error(f"Transaction {i} missing title field")
+                    raise ValueError(f"Transaction {i} missing title field")
+
+                # Validate category and subcategory
+                if transaction.category is not None:
+                    try:
+                        category_value = transaction.category.value
+                        logging.debug(f"Transaction {i} has category: {category_value}")
+                    except AttributeError:
+                        logging.error(
+                            f"Transaction {i} has invalid category type: {type(transaction.category)}"
+                        )
+                        transaction.category = None
+
+                if transaction.subcategory is not None:
+                    try:
+                        subcategory_value = transaction.subcategory.value
+                        logging.debug(
+                            f"Transaction {i} has subcategory: {subcategory_value}"
+                        )
+                    except AttributeError:
+                        logging.error(
+                            f"Transaction {i} has invalid subcategory type: {type(transaction.subcategory)}"
+                        )
+                        transaction.subcategory = None
+
+                # For Viseca transactions, handle special case
+                if batch.source == "VisecaProcessor" or (
+                    hasattr(transaction, "meta")
+                    and transaction.meta
+                    and transaction.meta.get("processor") == "Viseca"
+                ):
+                    logging.debug(f"Special handling for Viseca transaction {i}")
+                    # Ensure values are properly formatted for Cashew
+                    if hasattr(transaction, "amount"):
+                        # Ensure amount is negative for expenses
+                        if transaction.amount > 0:
+                            transaction.amount = -transaction.amount
+                            logging.debug(
+                                f"Converted positive amount to negative for Viseca transaction {i}"
+                            )
+
+            except Exception as e:
+                logging.error(f"Validation error for transaction {i}: {str(e)}")
+                raise ValueError(f"Invalid transaction at index {i}: {str(e)}")
+
         # Split transactions into smaller batches
-        batches = self._split_batch(batch.transactions)
+        batches = self._split_batch(batch.transactions, max_size=25)
+        logging.debug(f"Split into {len(batches)} batches of max 25 transactions each")
 
         if dry_run:
             # Return first batch URL for testing
             first_batch = TransactionBatch(transactions=batches[0], source=batch.source)
-            return self.get_add_transaction_url(batch=first_batch)
+            url = self.get_add_transaction_url(batch=first_batch)
+            logging.debug(f"Generated dry-run URL: {url}")
+            return url
 
         # Process each batch
-        for transactions in batches:
+        for i, transactions in enumerate(batches):
+            logging.debug(
+                f"Processing batch {i + 1}/{len(batches)} with {len(transactions)} transactions"
+            )
             sub_batch = TransactionBatch(transactions=transactions, source=batch.source)
             try:
                 url = self.get_add_transaction_url(batch=sub_batch)
+                logging.debug(f"Opening URL for batch {i + 1}: {url[:100]}...")
                 _open_url(url)
+                logging.debug(
+                    f"Successfully opened batch {i + 1}. Waiting 10 seconds before next batch."
+                )
                 time.sleep(10)
             except Exception as e:
-                raise RuntimeError(f"Failed to open batch in browser: {str(e)}")
+                logging.error(f"Failed to open batch {i + 1} in browser: {str(e)}")
+                raise RuntimeError(f"Failed to open batch {i + 1} in browser: {str(e)}")
 
+        logging.debug("Export completed successfully")
         return None

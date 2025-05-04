@@ -47,89 +47,6 @@ class BaseTransactionProcessor(ABC):
 
     # Shared merchant mappings for all processors
     SUGGESTED_MERCHANT_MAPPING = {
-        # # Dining - Delivery
-        # "Subway": CategoryMapping(
-        #     category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
-        # ),
-        # "Uber Eats": CategoryMapping(
-        #     category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
-        # ),
-        # # Transit and Travel
-        # "Shell": CategoryMapping(
-        #     category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
-        # ),
-        # "Socar": CategoryMapping(
-        #     category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
-        # ),
-        # # Shopping
-        # "WOMO STORE": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "Deichmann": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "FREITAG Geroldstrasse": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "Decathlon": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "Transa Backpacking AG": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "SportX": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
-        # ),
-        # "InMedia Haus GmbH": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
-        # ),
-        # "Orell Füssli": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
-        # ),
-        # "geschenkidee.ch": CategoryMapping(
-        #     category=Category.SHOPPING, subcategory=ShoppingSubcategory.GIFTS
-        # ),
-        # # Personal Care & Health
-        # "Coop Vitality": CategoryMapping(
-        #     category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
-        # ),
-        # "Medbase Apotheke": CategoryMapping(
-        #     category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
-        # ),
-        # "Akademischer Sportverband Zürich": CategoryMapping(
-        #     category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
-        # ),
-        # # Events and Venues
-        # "ZÜRICH OPENAIR": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
-        # ),
-        # "ZO Festival AG": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
-        # ),
-        # "Ticketcorner": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
-        # ),
-        # "Moods": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
-        # ),
-        # "Rent-a-Theater AG": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
-        # ),
-        # # Entertainment and Activities
-        # "Zuerichtheescape.p": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
-        # ),
-        # "Live Escape Game Schwe": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
-        # ),
-        # "the escape GmbH": CategoryMapping(
-        #     category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
-        # ),
-        # # Technology
-        # "Google Cloud": CategoryMapping(
-        #     category=Category.HOBBIES, subcategory=HobbiesSubcategory.TECH
-        # ),
-        # Confirmed needed
         "boulderlounge": CategoryMapping(
             category=Category.HOBBIES, subcategory=HobbiesSubcategory.BOULDERN
         ),
@@ -313,6 +230,9 @@ class BaseTransactionProcessor(ABC):
         "sva": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
         ),
+        "helsana": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
+        ),
     }
 
     def __init__(self, name: str):
@@ -327,6 +247,7 @@ class BaseTransactionProcessor(ABC):
         self.merchant_category_column: str = "Merchant Category"
         self.description_column: str = "Description"
         self.registered_category_column: str = "Registered Category"
+        self.amount_column: str = "Amount"
 
         # Initialize base mappings with shared merchant mappings
         self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
@@ -411,7 +332,20 @@ class BaseTransactionProcessor(ABC):
             ):
                 return mapping
 
-        return CategoryMapping(category=Category.SHOPPING, subcategory=None)
+        # For default categorization, check if it's a credit (positive amount)
+        is_twint = "twint" in row.get(self.merchant_column, "").lower()
+        if self.amount_column in row and float(row[self.amount_column]) > 0:
+            return CategoryMapping(
+                category=Category.INCOME,
+                subcategory=IncomeSubcategory.TWINT if is_twint else None,
+            )
+        return (
+            CategoryMapping(
+                category=Category.DINING, subcategory=DiningSubcategory.TWINT
+            )
+            if is_twint
+            else CategoryMapping(category=Category.SHOPPING, subcategory=None)
+        )
 
     @abstractmethod
     def load_data(

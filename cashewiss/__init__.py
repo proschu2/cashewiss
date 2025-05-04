@@ -27,6 +27,7 @@ from .core.client import CashewClient
 from .processors.swisscard import SwisscardProcessor
 from .processors.viseca import VisecaProcessor
 from .processors.migros import MigrosProcessor
+from .processors.zkb import ZKBProcessor
 
 __version__ = "0.1.0"
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "SwisscardProcessor",
     "VisecaProcessor",
     "MigrosProcessor",
+    "ZKBProcessor",
     # Category Enums
     "Category",
     "IncomeSubcategory",
