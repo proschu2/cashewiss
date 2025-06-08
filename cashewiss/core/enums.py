@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Type
 
 
 class IncomeSubcategory(str, Enum):
@@ -15,6 +16,7 @@ class BillsSubcategory(str, Enum):
     TAXES = "Taxes"
     FEES = "Fees"
     SUBSCRIPTIONS = "Subscriptions"
+    DONATIONS = "Donations"
 
 
 class EssentialsSubcategory(str, Enum):
@@ -83,3 +85,35 @@ class Category(str, Enum):
     HOBBIES = "Hobbies"
     TRAVEL = "Travel"
     FINANCIAL = "Financial"
+
+
+SUBCATEGORY_TYPES: dict[Category, Type[Enum]] = {
+    Category.INCOME: IncomeSubcategory,
+    Category.BILLS: BillsSubcategory,
+    Category.ESSENTIALS: EssentialsSubcategory,
+    Category.DINING: DiningSubcategory,
+    Category.SHOPPING: ShoppingSubcategory,
+    Category.HOUSEHOLD: HouseholdSubcategory,
+    Category.PERSONAL_CARE: PersonalCareSubcategory,
+    Category.LEISURE: LeisureSubcategory,
+    Category.HOBBIES: HobbiesSubcategory,
+    Category.TRAVEL: TravelSubcategory,
+    Category.FINANCIAL: FinancialSubcategory,
+}
+
+
+__all__ = [
+    "Category",
+    "IncomeSubcategory",
+    "BillsSubcategory",
+    "EssentialsSubcategory",
+    "DiningSubcategory",
+    "ShoppingSubcategory",
+    "HouseholdSubcategory",
+    "PersonalCareSubcategory",
+    "LeisureSubcategory",
+    "HobbiesSubcategory",
+    "TravelSubcategory",
+    "FinancialSubcategory",
+    "SUBCATEGORY_TYPES",
+]

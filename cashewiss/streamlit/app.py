@@ -15,7 +15,171 @@ from cashewiss import (
     ZKBProcessor,
     TransactionBatch,
     Transaction,
+    CashewClient,
 )
+from cashewiss.core.enums import (
+    Category as TransactionCategory,
+    IncomeSubcategory,
+    BillsSubcategory,
+    EssentialsSubcategory,
+    DiningSubcategory,
+    ShoppingSubcategory,
+    HouseholdSubcategory,
+    PersonalCareSubcategory,
+    LeisureSubcategory,
+    HobbiesSubcategory,
+    TravelSubcategory,
+    FinancialSubcategory,
+)
+
+
+class StreamlitProcessorComponent:
+    """Base component for handling processor-specific Streamlit UIs with state management."""
+
+    def __init__(
+        self,
+        processor_type: str,
+        file_extensions: list[str],
+        default_name: str,
+        info_message: str = None,
+    ):
+        self.processor_type = (
+            processor_type.lower()
+        )  # e.g. "swisscard", "migros", "zkb"
+        self.file_extensions = file_extensions  # e.g. ["xlsx"] or ["csv"]
+        self.default_name = default_name
+        self.info_message = info_message
+
+        # Initialize session state
+        if f"{self.processor_type}_file" not in st.session_state:
+            st.session_state[f"{self.processor_type}_file"] = None
+        if f"{self.processor_type}_processor" not in st.session_state:
+            st.session_state[f"{self.processor_type}_processor"] = None
+        if f"{self.processor_type}_account" not in st.session_state:
+            st.session_state[f"{self.processor_type}_account"] = ""
+        if f"{self.processor_type}_provider" not in st.session_state:
+            st.session_state[f"{self.processor_type}_provider"] = default_name
+
+    def render(self, date_from: date, date_to: date):
+        """Render the processor UI and handle file processing."""
+        st.header(f"{self.default_name} Transaction Processing")
+
+        if self.info_message:
+            st.info(self.info_message)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            uploaded_file = st.file_uploader(
+                f"Upload {self.default_name} {self.file_extensions[0].upper()} file",
+                type=self.file_extensions,
+            )
+            if uploaded_file != st.session_state[f"{self.processor_type}_file"]:
+                st.session_state[f"{self.processor_type}_file"] = uploaded_file
+                st.session_state[f"{self.processor_type}_processor"] = None
+                # Clear any existing transaction data
+                if "edited_transactions" in st.session_state:
+                    del st.session_state["edited_transactions"]
+                if "filtered_transactions" in st.session_state:
+                    del st.session_state["filtered_transactions"]
+                st.rerun()
+
+        with col2:
+            account_name = st.text_input(
+                "Account Name (for categorization)",
+                value=st.session_state[f"{self.processor_type}_account"],
+                key=f"{self.processor_type}_account_input",
+            )
+            provider_name = st.text_input(
+                "Provider Name (will be added to all transactions)",
+                value=st.session_state[f"{self.processor_type}_provider"],
+                key=f"{self.processor_type}_provider_input",
+            )
+
+            # Update stored values and reprocess if needed
+            values_changed = False
+            if account_name != st.session_state[f"{self.processor_type}_account"]:
+                st.session_state[f"{self.processor_type}_account"] = account_name
+                values_changed = True
+            if provider_name != st.session_state[f"{self.processor_type}_provider"]:
+                st.session_state[f"{self.processor_type}_provider"] = provider_name
+                values_changed = True
+
+            if (
+                values_changed
+                and st.session_state[f"{self.processor_type}_processor"] is not None
+            ):
+                st.info("Updating processor with new values...")
+                # Clear processor and any existing transaction data
+                st.session_state[f"{self.processor_type}_processor"] = None
+                if "edited_transactions" in st.session_state:
+                    del st.session_state["edited_transactions"]
+                st.rerun()
+
+        # Process file if we have it
+        if st.session_state[f"{self.processor_type}_file"]:
+            try:
+                with st.spinner("Processing transactions..."):
+                    processor = self.get_processor(provider_name, account_name)
+                    batch = processor.process(
+                        st.session_state[f"{self.processor_type}_file"],
+                        date_from=date_from,
+                        date_to=date_to,
+                    )
+                    display_transactions(batch.transactions)
+            except Exception as e:
+                st.error(f"Error processing transactions: {str(e)}")
+
+    def get_processor(self, provider_name: str, account_name: str):
+        """Get or create processor with current settings."""
+        processor = st.session_state[f"{self.processor_type}_processor"]
+
+        # Create new processor if needed or if values changed
+        if (
+            processor is None
+            or processor.name != provider_name
+            or processor.account_name != account_name
+        ):
+            processor = self.create_processor(provider_name, account_name)
+            st.session_state[f"{self.processor_type}_processor"] = processor
+
+        return processor
+
+    def create_processor(self, provider_name: str, account_name: str):
+        """Create appropriate processor based on type."""
+        if self.processor_type == "swisscard":
+            return SwisscardProcessor(name=provider_name, account=account_name)
+        elif self.processor_type == "migros":
+            return MigrosProcessor(name=provider_name, account=account_name)
+        elif self.processor_type == "zkb":
+            return ZKBProcessor(name=provider_name, account=account_name)
+
+
+def get_subcategories_for_category(category: str) -> list[str]:
+    """Get valid subcategories for a given category."""
+    category_to_subcategory = {
+        TransactionCategory.INCOME.value: [sub.value for sub in IncomeSubcategory],
+        TransactionCategory.BILLS.value: [sub.value for sub in BillsSubcategory],
+        TransactionCategory.ESSENTIALS.value: [
+            sub.value for sub in EssentialsSubcategory
+        ],
+        TransactionCategory.DINING.value: [sub.value for sub in DiningSubcategory],
+        TransactionCategory.SHOPPING.value: [sub.value for sub in ShoppingSubcategory],
+        TransactionCategory.HOUSEHOLD.value: [
+            sub.value for sub in HouseholdSubcategory
+        ],
+        TransactionCategory.PERSONAL_CARE.value: [
+            sub.value for sub in PersonalCareSubcategory
+        ],
+        TransactionCategory.LEISURE.value: [sub.value for sub in LeisureSubcategory],
+        TransactionCategory.HOBBIES.value: [sub.value for sub in HobbiesSubcategory],
+        TransactionCategory.TRAVEL.value: [sub.value for sub in TravelSubcategory],
+        TransactionCategory.FINANCIAL.value: [
+            sub.value for sub in FinancialSubcategory
+        ],
+    }
+    return category_to_subcategory.get(category, [])
+
 
 st.set_page_config(
     page_title="Cashewiss - Swiss Card Transaction Processor",
@@ -65,46 +229,18 @@ def main():
 
 def process_zkb(date_from: date, date_to: date):
     """Handle ZKB transaction processing."""
-    st.header("ZKB Transaction Processing")
-
-    st.info("""
-    ℹ️ Expected CSV format:
-    - Semicolon (;) separated values
-    - Required columns: Date, Booking text, ZKB reference, Reference number, Debit CHF, Credit CHF, Value date, Balance CHF
-    - Debit/Credit amounts in separate columns
-    """)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        uploaded_file = st.file_uploader("Upload ZKB CSV file", type=["csv"])
-
-    with col2:
-        account_name = st.text_input(
-            "Account Name (for categorization)", key="zkb_account"
-        )
-        provider_name = st.text_input(
-            "Provider Name (will be added to all transactions)",
-            key="zkb_notes",
-            value="ZKB",
-        )
-
-    if uploaded_file:
-        try:
-            with st.spinner("Processing transactions..."):
-                processor = ZKBProcessor(name=provider_name, account=account_name)
-
-                # Process transactions
-                batch = processor.process(
-                    uploaded_file,
-                    date_from=date_from,
-                    date_to=date_to,
-                )
-
-                display_transactions(batch.transactions)
-
-        except Exception as e:
-            st.error(f"Error processing transactions: {str(e)}")
+    processor = StreamlitProcessorComponent(
+        processor_type="zkb",
+        file_extensions=["csv"],
+        default_name="ZKB",
+        info_message="""
+        ℹ️ Expected CSV format:
+        - Semicolon (;) separated values
+        - Required columns: Date, Booking text, ZKB reference, Reference number, Debit CHF, Credit CHF, Value date, Balance CHF
+        - Debit/Credit amounts in separate columns
+        """,
+    )
+    processor.render(date_from, date_to)
 
 
 def process_viseca(date_from: date, date_to: date):
@@ -429,86 +565,34 @@ def process_viseca(date_from: date, date_to: date):
 
 def process_migros(date_from: date, date_to: date):
     """Handle Migros Bank transaction processing."""
-    st.header("Migros Bank Transaction Processing")
+    processor = StreamlitProcessorComponent(
+        processor_type="migros",
+        file_extensions=["csv"],
+        default_name="Migros Bank",
+        info_message="""
+        ℹ️ Expected CSV format:
+        - Semicolon (;) separated values
+        - Header starts at row 14
+        - Required columns: Datum, Buchungstext, Mitteilung, Referenznummer, Betrag, Saldo, Valuta
+        - Amounts in Swiss format (e.g. -12,32)
 
-    st.info("""
-    ℹ️ Expected CSV format:
-    - Semicolon (;) separated values
-    - Header starts at row 14
-    - Required columns: Datum, Buchungstext, Mitteilung, Referenznummer, Betrag, Saldo, Valuta
-    - Amounts in Swiss format (e.g. -12,32)
-
-    Note: The processor automatically filters out:
-    - Viseca card entries (containing "Karte: 474124*****0910")
-    - TWINT entries containing "+417"
-    """)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        uploaded_file = st.file_uploader("Upload Migros Bank CSV file", type=["csv"])
-
-    with col2:
-        account_name = st.text_input(
-            "Account Name (for categorization)", key="migros_account"
-        )
-        provider_name = st.text_input(
-            "Provider Name (will be added to all transactions)",
-            key="migros_notes",
-            value="Migros Bank",
-        )
-
-    if uploaded_file:
-        try:
-            with st.spinner("Processing transactions..."):
-                processor = MigrosProcessor(name=provider_name, account=account_name)
-
-                # Process transactions
-                batch = processor.process(
-                    uploaded_file,
-                    date_from=date_from,
-                    date_to=date_to,
-                )
-
-                display_transactions(batch.transactions)
-
-        except Exception as e:
-            st.error(f"Error processing transactions: {str(e)}")
+        Note: The processor automatically filters out:
+        - Viseca card entries (containing "Karte: 474124*****0910")
+        - TWINT entries containing "+417"
+        """,
+    )
+    processor.render(date_from, date_to)
 
 
 def process_swisscard(date_from: date, date_to: date):
     """Handle Swisscard transaction processing."""
-    st.header("Swisscard Transaction Processing")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        uploaded_file = st.file_uploader("Upload Swisscard XLSX file", type=["xlsx"])
-
-    with col2:
-        account_name = st.text_input(
-            "Account Name (for categorization)", key="swisscard_account"
-        )
-        provider_name = st.text_input(
-            "Provider Name (will be added to all transactions)", key="swisscard_notes"
-        )
-
-    if uploaded_file:
-        try:
-            with st.spinner("Processing transactions..."):
-                processor = SwisscardProcessor(name=provider_name, account=account_name)
-
-                # Process transactions
-                batch = processor.process(
-                    uploaded_file,
-                    date_from=date_from,
-                    date_to=date_to,
-                )
-
-                display_transactions(batch.transactions)
-
-        except Exception as e:
-            st.error(f"Error processing transactions: {str(e)}")
+    processor = StreamlitProcessorComponent(
+        processor_type="swisscard",
+        file_extensions=["xlsx"],
+        default_name="Swisscard",
+        info_message=None,
+    )
+    processor.render(date_from, date_to)
 
 
 def display_transactions(transactions):
@@ -596,38 +680,78 @@ def display_transactions(transactions):
     if group_by != "None":
         filtered_df = filtered_df.sort_values(group_by)
 
-    # Display enhanced table with custom formatting
-    st.dataframe(
-        filtered_df,
+    # Help message for editing
+    st.info(
+        "💡 Click on the Category or Subcategory cells to change them. Changes will be saved automatically."
+    )
+
+    # Initialize edited data in session state
+    if "edited_transactions" not in st.session_state:
+        st.session_state.edited_transactions = filtered_df.copy()
+
+    # Display enhanced table with custom formatting and editing capabilities
+    edited_df = st.data_editor(
+        st.session_state.edited_transactions,
         hide_index=True,
         use_container_width=True,
         column_config={
             "Amount": st.column_config.NumberColumn(
-                "Amount", format="CHF %.2f", help="Transaction amount"
+                "Amount", format="CHF %.2f", help="Transaction amount", disabled=True
             ),
             "Date": st.column_config.DateColumn(
-                "Date", format="DD/MM/YYYY", help="Transaction date"
+                "Date", format="DD/MM/YYYY", help="Transaction date", disabled=True
             ),
-            "Category": st.column_config.Column(
-                "Category", help="Transaction category", width="medium"
+            "Category": st.column_config.SelectboxColumn(
+                "Category",
+                help="Click to change transaction category",
+                width="medium",
+                options=sorted([cat.value for cat in TransactionCategory]),
+                required=True,
             ),
             "Title": st.column_config.TextColumn(
-                "Title", help="Transaction description", width="large"
+                "Title", help="Transaction description", width="large", disabled=True
             ),
             "Currency": st.column_config.TextColumn(
-                "Currency", help="Transaction currency", width="small"
+                "Currency", help="Transaction currency", width="small", disabled=True
             ),
-            "Subcategory": st.column_config.TextColumn(
-                "Subcategory", help="Transaction subcategory", width="medium"
+            "Subcategory": st.column_config.SelectboxColumn(
+                "Subcategory",
+                help="Click to change transaction subcategory (options depend on selected category)",
+                width="medium",
+                options=sorted(
+                    set(
+                        sub.value
+                        for cat_enum in [
+                            IncomeSubcategory,
+                            BillsSubcategory,
+                            EssentialsSubcategory,
+                            DiningSubcategory,
+                            ShoppingSubcategory,
+                            HouseholdSubcategory,
+                            PersonalCareSubcategory,
+                            LeisureSubcategory,
+                            HobbiesSubcategory,
+                            TravelSubcategory,
+                            FinancialSubcategory,
+                        ]
+                        for sub in cat_enum
+                    )
+                ),
             ),
             "Account": st.column_config.TextColumn(
-                "Account", help="Account name", width="medium"
+                "Account", help="Account name", width="medium", disabled=True
             ),
             "Notes": st.column_config.TextColumn(
-                "Notes", help="Additional notes", width="large"
+                "Notes", help="Additional notes", width="large", disabled=True
             ),
         },
+        key="transaction_editor",
     )
+
+    # Update session state with edited data
+    if edited_df is not None:
+        st.session_state.edited_transactions = edited_df
+        filtered_df = edited_df  # Update filtered_df to reflect changes
 
     # Export options
     st.subheader("Export Options")
@@ -653,8 +777,6 @@ def display_transactions(transactions):
             # Create a container that will persist through rerendering
             debug_container = st.container()
             with debug_container:
-                st.write("Beginning Cashew export process...")
-
                 # Add debug log file
                 import logging
                 import tempfile
@@ -674,16 +796,13 @@ def display_transactions(transactions):
 
                 # Log the start of processing
                 logging.info(f"Starting Cashew export - Log file: {log_file}")
-                st.info(f"Debug log created at: {log_file}")
 
                 try:
                     # Load CashewClient
-                    logging.info("Attempting to import CashewClient")
+                    logging.info("Attempting to initialize CashewClient")
                     try:
-                        from cashewiss import CashewClient
-
-                        logging.info("CashewClient imported successfully")
-                        st.write("CashewClient loaded")
+                        client = CashewClient()
+                        logging.info("CashewClient initialized successfully")
                     except Exception as e:
                         error_msg = f"Failed to import CashewClient: {str(e)}"
                         logging.error(error_msg)
@@ -742,7 +861,6 @@ def display_transactions(transactions):
                     try:
                         client = CashewClient()
                         logging.info("CashewClient initialized successfully")
-                        st.write("CashewClient initialized")
                     except Exception as e:
                         error_msg = f"Failed to initialize CashewClient: {str(e)}"
                         logging.error(error_msg)
@@ -761,8 +879,6 @@ def display_transactions(transactions):
                         logging.info("Attempting test export with dry_run=True")
                         test_url = client.export_to_api(test_batch, dry_run=True)
                         logging.info(f"Test export successful: {test_url}")
-                        st.success("Test export successful!")
-                        st.write(f"Test URL: {test_url}")
                     except Exception as e:
                         error_msg = f"Test export failed: {str(e)}"
                         logging.error(error_msg)
@@ -773,11 +889,6 @@ def display_transactions(transactions):
                             "The export failed at the test stage. Please check the log file."
                         )
                         return
-
-                    # If we get here, the basic functionality works
-                    st.success(
-                        "Basic functionality test passed. Continuing with validation..."
-                    )
 
                     # Now proceed with validating the actual transactions
                     logging.info("Beginning transaction validation")
@@ -926,125 +1037,6 @@ def display_transactions(transactions):
                                 st.text(log_contents)
                     except Exception as log_e:
                         st.error(f"Could not read log file: {str(log_e)}")
-
-
-# Utility function for direct export to avoid any complex processing
-def direct_viseca_export(transactions, batch_size=10):
-    """Direct export method for Viseca transactions that bypasses the normal export flow"""
-    if not transactions:
-        st.error("No transactions to export")
-        return False
-
-    # Create a debug container that will persist
-    debug_container = st.container()
-    with debug_container:
-        st.subheader("Export Debug Information")
-        st.write(f"Starting export for {len(transactions)} transactions")
-
-    try:
-        # Create simple transaction objects from dataframe rows
-        simple_transactions = []
-        for _, t in transactions.iterrows():
-            try:
-                # Convert date to string if it's a datetime object
-                if isinstance(t["Date"], (pd.Timestamp, date)):
-                    date_str = t["Date"].isoformat()
-                else:
-                    date_str = str(t["Date"])
-
-                # Create a simplified transaction dict
-                transaction = {
-                    "date": date_str,
-                    "title": str(t["Title"]),
-                    "amount": float(t["Amount"]),
-                    "currency": str(t["Currency"]),
-                    "category": str(t["Category"])
-                    if not pd.isna(t["Category"])
-                    else None,
-                    "subcategory": str(t["Subcategory"])
-                    if not pd.isna(t["Subcategory"])
-                    else None,
-                    "account": str(t["Account"]) if not pd.isna(t["Account"]) else None,
-                    "notes": str(t["Notes"]) if not pd.isna(t["Notes"]) else None,
-                }
-                simple_transactions.append(transaction)
-            except Exception as row_err:
-                with debug_container:
-                    st.error(f"Error processing row: {str(row_err)}")
-                    st.write(f"Problematic row: {t.to_dict()}")
-
-        with debug_container:
-            st.write(f"Successfully prepared {len(simple_transactions)} transactions")
-            st.write(
-                f"First transaction sample: {simple_transactions[0] if simple_transactions else 'None'}"
-            )
-
-        # Split into batches
-        batches = [
-            simple_transactions[i : i + batch_size]
-            for i in range(0, len(simple_transactions), batch_size)
-        ]
-
-        with debug_container:
-            st.write(
-                f"Split into {len(batches)} batches of max {batch_size} transactions each"
-            )
-
-        # Base URL
-        base_url = "https://budget-track.web.app/addTransaction"
-
-        # Create URL for display
-        first_batch = batches[0] if batches else []
-        transactions_data = {"transactions": first_batch}
-        json_str = json.dumps(transactions_data, separators=(",", ":"))
-        encoded_json = urllib.parse.quote(json_str)
-        first_url = f"{base_url}?JSON={encoded_json}"
-
-        with debug_container:
-            st.success(
-                f"Generated URL for first batch of {len(first_batch)} transactions"
-            )
-            st.code(first_url[:100] + "..." if len(first_url) > 100 else first_url)
-
-        # Show the URL prominently
-        st.success(f"Export prepared with {len(batches)} batches of transactions")
-        st.markdown(f"**Export URL**: [Click to open in browser]({first_url})")
-
-        # Create a button to manually open all batches
-        if st.button("Open All Batches in Browser", key="open_all_batches"):
-            with st.spinner("Opening batches in browser..."):
-                # Create and open URLs
-                for i, batch in enumerate(batches):
-                    with debug_container:
-                        st.write(f"Processing batch {i + 1}/{len(batches)}")
-
-                    transactions_data = {"transactions": batch}
-                    json_str = json.dumps(transactions_data, separators=(",", ":"))
-                    encoded_json = urllib.parse.quote(json_str)
-                    url = f"{base_url}?JSON={encoded_json}"
-
-                    # Try to open in browser
-                    try:
-                        webbrowser.open(url)
-                        with debug_container:
-                            st.write(f"Opened batch {i + 1} in browser")
-                        if i < len(batches) - 1:
-                            time.sleep(3)  # Wait between batches
-                    except Exception as browser_err:
-                        with debug_container:
-                            st.error(
-                                f"Failed to open batch {i + 1}: {str(browser_err)}"
-                            )
-
-                st.success(f"Completed opening {len(batches)} batches")
-
-        return True
-
-    except Exception as e:
-        with debug_container:
-            st.error(f"Export failed: {str(e)}")
-            st.code(traceback.format_exc())
-        return False
 
 
 if __name__ == "__main__":

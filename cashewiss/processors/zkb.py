@@ -2,7 +2,15 @@ from datetime import date
 from typing import Optional, List
 import polars as pl
 
-from ..core.base import BaseTransactionProcessor, Transaction
+from cashewiss.core.models import CategoryMapping
+from cashewiss.core.enums import (
+    BillsSubcategory,
+    Category,
+    FinancialSubcategory,
+    IncomeSubcategory,
+)
+
+from cashewiss.core.base import BaseTransactionProcessor, Transaction
 
 
 class ZKBProcessor(BaseTransactionProcessor):
@@ -19,6 +27,25 @@ class ZKBProcessor(BaseTransactionProcessor):
         self.registered_category_column = None
 
         # Set up base merchant mappings
+        self.set_category_mapper(
+            {
+                "monti sanzio & caldari serena, hohlstrasse 117": CategoryMapping(
+                    category=Category.HOUSEHOLD,
+                ),
+                "post ch ag": CategoryMapping(
+                    category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
+                ),
+                "caritas": CategoryMapping(
+                    category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+                ),
+                "wise": CategoryMapping(category=Category.TRAVEL),
+                "brokers": CategoryMapping(
+                    category=Category.FINANCIAL,
+                    subcategory=FinancialSubcategory.INVESTMENTS,
+                ),
+            },
+            mapper_type=self.merchant_column,
+        )
         self.set_default_merchant_mapping()
 
     def load_data(

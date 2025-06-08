@@ -250,7 +250,7 @@ class BaseTransactionProcessor(ABC):
         self.amount_column: str = "Amount"
 
         # Initialize base mappings with shared merchant mappings
-        self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
+        # self.set_category_mapper(self.SUGGESTED_MERCHANT_MAPPING, self.merchant_column)
 
     def set_default_merchant_mapping(self):
         """
