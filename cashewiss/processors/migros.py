@@ -85,7 +85,11 @@ class MigrosProcessor(BaseTransactionProcessor):
 
         # Convert Betrag from Swiss format (-12,32) to standard decimal format (-12.32)
         df = df.with_columns(
-            pl.col("Betrag").str.replace(",", ".").cast(pl.Float64).alias("Betrag")
+            pl.when(pl.col("Betrag").cast(pl.String).str.contains(","))
+            .then(pl.col("Betrag").cast(pl.String).str.replace(",", "."))
+            .otherwise(pl.col("Betrag"))
+            .cast(pl.Float64)
+            .alias("Betrag")
         )
 
         # Apply date filtering if provided

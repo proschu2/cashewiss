@@ -523,25 +523,35 @@ def process_viseca(date_from: date, date_to: date):
 
                                     # Option to open all batches
                                     if st.button("Open All Batches in Browser"):
-                                        for i, batch in enumerate(batches):
-                                            batch_data = {"transactions": batch}
-                                            batch_json = json.dumps(
-                                                batch_data, separators=(",", ":")
-                                            )
-                                            batch_encoded = urllib.parse.quote(
-                                                batch_json
-                                            )
-                                            batch_url = (
-                                                f"{base_url}?JSON={batch_encoded}"
-                                            )
+                                        progress_bar = st.progress(0)
+                                        status_text = st.empty()
 
+                                        for i, batch in enumerate(batches):
                                             try:
-                                                st.write(
-                                                    f"Opening batch {i + 1}/{len(batches)}..."
+                                                status_text.text(
+                                                    f"Processing batch {i + 1}/{len(batches)}..."
                                                 )
+                                                batch_data = {"transactions": batch}
+                                                batch_json = json.dumps(
+                                                    batch_data, separators=(",", ":")
+                                                )
+                                                batch_encoded = urllib.parse.quote(
+                                                    batch_json
+                                                )
+                                                batch_url = (
+                                                    f"{base_url}?JSON={batch_encoded}"
+                                                )
+
                                                 webbrowser.open(batch_url)
+                                                progress_bar.progress(
+                                                    (i + 1) / len(batches)
+                                                )
+
                                                 if i < len(batches) - 1:
-                                                    time.sleep(3)
+                                                    time.sleep(
+                                                        3
+                                                    )  # Give browser time to open tab
+
                                             except Exception as e:
                                                 st.error(
                                                     f"Error opening batch {i + 1}: {str(e)}"
@@ -549,6 +559,12 @@ def process_viseca(date_from: date, date_to: date):
                                                 st.markdown(
                                                     f"**[Manual link for batch {i + 1}]({batch_url})**"
                                                 )
+                                                continue
+
+                                        status_text.success(
+                                            f"All {len(batches)} batches processed!"
+                                        )
+                                        progress_bar.empty()
                                 else:
                                     st.error("No transactions to export")
 
