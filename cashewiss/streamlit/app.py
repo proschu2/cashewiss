@@ -82,6 +82,8 @@ class StreamlitProcessorComponent:
                     del st.session_state["edited_transactions"]
                 if "filtered_transactions" in st.session_state:
                     del st.session_state["filtered_transactions"]
+                if "export_urls" in st.session_state:
+                    del st.session_state["export_urls"]
                 st.rerun()
 
         with col2:
@@ -991,13 +993,29 @@ def display_transactions(transactions):
                             )
                             st.info("Debug mode enabled for Viseca transactions")
 
+                        # Store export URLs in session state to persist after export
+                        if "export_urls" not in st.session_state:
+                            st.session_state.export_urls = None
+
                         export_result = client.export_to_api(
                             export_batch, dry_run=True, debug=enable_debug
                         )
-                        st.success("Successfully generated export URL!")
-                        st.markdown(
-                            f"**Export URL**: [Click to open in browser]({export_result})"
-                        )
+                        st.session_state.export_urls = export_result
+
+                        st.success("Successfully generated export URL(s)!")
+
+                        # Handle both single URL and list of URLs
+                        if isinstance(st.session_state.export_urls, list):
+                            st.markdown("**Export URLs (multiple batches):**")
+                            for i, url in enumerate(st.session_state.export_urls, 1):
+                                st.markdown(
+                                    f"**Batch {i}**: [Click to open in browser]({url})"
+                                )
+                        else:
+                            st.markdown(
+                                f"**Export URL**: [Click to open in browser]({st.session_state.export_urls})"
+                            )
+
                         st.warning(
                             "Note: For large transaction sets, multiple browser windows may open (batches of 25 transactions)."
                         )
@@ -1011,6 +1029,9 @@ def display_transactions(transactions):
                                     st.success(
                                         f"Exported {len(export_transactions)} transactions to Cashew!"
                                     )
+                                    st.info(
+                                        "✅ Browser tabs should have opened automatically. If not, please use the manual links above."
+                                    )
                                 except Exception as export_error:
                                     error_msg = f"Export failed: {str(export_error)}"
                                     logging.error(error_msg)
@@ -1021,10 +1042,25 @@ def display_transactions(transactions):
 
                                     # Provide manual URL as fallback
                                     st.error(
-                                        "Automatic export failed. Please use the URL below to manually import:"
+                                        "⚠️ Automatic browser opening failed. This is common in web environments. Please use the manual links below:"
                                     )
-                                    st.markdown(
-                                        f"**Manual Import URL**: [Click to open in browser]({export_result})"
+                                    # Handle both single URL and list of URLs for manual import
+                                    if isinstance(st.session_state.export_urls, list):
+                                        st.markdown(
+                                            "**Manual Import URLs (multiple batches):**"
+                                        )
+                                        for i, url in enumerate(
+                                            st.session_state.export_urls, 1
+                                        ):
+                                            st.markdown(
+                                                f"**Batch {i}**: [Click to open in browser]({url})"
+                                            )
+                                    else:
+                                        st.markdown(
+                                            f"**Manual Import URL**: [Click to open in browser]({st.session_state.export_urls})"
+                                        )
+                                    st.info(
+                                        "💡 **Tip**: Right-click the links and select 'Open in new tab' to import your transactions."
                                     )
 
                     except Exception as conversion_error:

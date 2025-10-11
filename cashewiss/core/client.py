@@ -2,7 +2,7 @@ import json
 import urllib.parse
 import subprocess
 import platform
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import date
 import time
 from .base import TransactionBatch, Transaction
@@ -10,18 +10,40 @@ from .base import TransactionBatch, Transaction
 
 def _open_url(url: str):
     """Open URL in browser based on OS."""
+    import webbrowser
+    import logging
+
+    logging.info(f"Attempting to open URL: {url[:100]}...")
+
+    # Try using webbrowser module first (more reliable)
+    try:
+        result = webbrowser.open(url, new=2)  # new=2 opens in new tab if possible
+        if result:
+            logging.info("Successfully opened URL using webbrowser module")
+            return True
+        else:
+            logging.warning(
+                "webbrowser.open() returned False - browser may not have opened"
+            )
+    except Exception as webbrowser_error:
+        logging.warning(f"webbrowser module failed: {webbrowser_error}")
+
+    # Fallback to subprocess method
     system = platform.system().lower()
     try:
         if system == "darwin":  # macOS
-            subprocess.run(["open", url])
+            subprocess.run(["open", url], check=True)
         elif system == "windows":
-            subprocess.run(["start", url], shell=True)
+            subprocess.run(["start", url], shell=True, check=True)
         elif system == "linux":
-            subprocess.run(["xdg-open", url])
+            subprocess.run(["xdg-open", url], check=True)
         else:
             raise OSError(f"Unsupported operating system: {system}")
+        logging.info("Successfully opened URL using subprocess method")
+        return True
     except Exception as e:
-        raise RuntimeError(f"Failed to open URL: {str(e)}")
+        logging.error(f"All browser opening methods failed: {str(e)}")
+        return False
 
 
 class CashewClient:
@@ -141,17 +163,19 @@ class CashewClient:
 
     def export_to_api(
         self, batch: TransactionBatch, dry_run: bool = False, debug: bool = False
-    ) -> Optional[str]:
+    ) -> Union[str, List[str], None]:
         """
         Export transactions via Cashew API.
 
         Args:
             batch: TransactionBatch to export
-            dry_run: If True, return URL instead of opening browser
+            dry_run: If True, return URL(s) instead of opening browser
             debug: If True, print debug information
 
         Returns:
-            URL string if dry_run=True, otherwise None
+            Single URL string if dry_run=True and only one batch,
+            List of URLs if dry_run=True and multiple batches,
+            None if dry_run=False
         """
         import logging
 
@@ -229,13 +253,25 @@ class CashewClient:
         logging.debug(f"Split into {len(batches)} batches of max 25 transactions each")
 
         if dry_run:
-            # Return first batch URL for testing
-            first_batch = TransactionBatch(transactions=batches[0], source=batch.source)
-            url = self.get_add_transaction_url(batch=first_batch)
-            logging.debug(f"Generated dry-run URL: {url}")
-            return url
+            # Return all batch URLs for testing
+            batch_urls = []
+            for i, transactions in enumerate(batches):
+                sub_batch = TransactionBatch(
+                    transactions=transactions, source=batch.source
+                )
+                url = self.get_add_transaction_url(batch=sub_batch)
+                batch_urls.append(url)
+                logging.debug(
+                    f"Generated dry-run URL for batch {i + 1}: {url[:100]}..."
+                )
+
+            # Return single URL if only one batch, otherwise return list
+            if len(batch_urls) == 1:
+                return batch_urls[0]
+            return batch_urls
 
         # Process each batch
+        failed_batches = []
         for i, transactions in enumerate(batches):
             logging.debug(
                 f"Processing batch {i + 1}/{len(batches)} with {len(transactions)} transactions"
@@ -244,14 +280,37 @@ class CashewClient:
             try:
                 url = self.get_add_transaction_url(batch=sub_batch)
                 logging.debug(f"Opening URL for batch {i + 1}: {url[:100]}...")
-                _open_url(url)
-                logging.debug(
-                    f"Successfully opened batch {i + 1}. Waiting 10 seconds before next batch."
-                )
-                time.sleep(10)
+                success = _open_url(url)
+                if success:
+                    logging.info(f"Successfully opened batch {i + 1} in browser")
+                    logging.debug(
+                        f"Successfully opened batch {i + 1}. Waiting 10 seconds before next batch."
+                    )
+                    time.sleep(10)
+                else:
+                    logging.warning(
+                        f"Browser opening may have failed for batch {i + 1}"
+                    )
+                    failed_batches.append((i + 1, url))
+                    # Continue with next batch even if this one failed
+                    time.sleep(5)  # Shorter delay for failed batches
             except Exception as e:
-                logging.error(f"Failed to open batch {i + 1} in browser: {str(e)}")
-                raise RuntimeError(f"Failed to open batch {i + 1} in browser: {str(e)}")
+                error_msg = f"Failed to open batch {i + 1} in browser: {str(e)}"
+                logging.error(error_msg)
+                logging.error(f"URL that failed: {url}")
+                failed_batches.append((i + 1, url))
+                # Continue with next batch even if this one failed
+                time.sleep(5)  # Shorter delay for failed batches
 
-        logging.debug("Export completed successfully")
+        if failed_batches:
+            logging.warning(
+                f"{len(failed_batches)} batch(es) failed to open automatically"
+            )
+            # Return the failed URLs so they can be displayed for manual opening
+            failed_urls = [url for _, url in failed_batches]
+            if len(failed_urls) == 1:
+                return failed_urls[0]
+            return failed_urls
+
+        logging.info(f"Export completed successfully - opened {len(batches)} batch(es)")
         return None

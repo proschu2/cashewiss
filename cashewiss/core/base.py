@@ -74,9 +74,9 @@ class BaseTransactionProcessor(ABC):
         "sv": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.WORK
         ),
-        "plaza": CategoryMapping(
-            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
-        ),
+        # "plaza": CategoryMapping(
+        #    category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        # ),
         "too good to go": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.DATE
         ),
