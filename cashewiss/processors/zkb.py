@@ -88,7 +88,15 @@ class ZKBProcessor(BaseTransactionProcessor):
         df = df.with_columns(
             [
                 (pl.col("Credit CHF") - pl.col("Debit CHF")).alias("Amount"),
-                df["Booking text"].str.contains("TWINT").alias("is_twint"),
+                (
+                    pl.col("Booking text").str.contains("TWINT")
+                    & pl.col("Booking text").str.contains("+41", literal=True)
+                ).alias("is_twint"),  # twint
+                (
+                    pl.col("Booking text")
+                    .str.contains("ZKB Visa Debit card", literal=True)
+                    .alias("is_cc_payment")
+                ),
             ]
         )
 
@@ -99,7 +107,15 @@ class ZKBProcessor(BaseTransactionProcessor):
                 pl.col("Booking text").str.count_matches(",").alias("tot_commas")
             )
             .with_columns(
-                pl.when(pl.col("tot_commas") > 1)
+                pl.when(pl.col("is_cc_payment"))
+                .then(
+                    pl.col("Booking text")
+                    .str.split(",")
+                    .list.slice(1)  # Get all parts after first comma
+                    .list.join(", ")  # Join them back with commas
+                    .str.strip_chars()
+                )
+                .when(pl.col("tot_commas") > 1)
                 .then(pl.col("Booking text").str.split(",").list[0])
                 .otherwise(pl.col("Booking text"))
                 .str.strip_chars()
