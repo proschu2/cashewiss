@@ -325,7 +325,7 @@ MERCHANT_MAPPINGS = {
         category=Category.BILLS, subcategory=BillsSubcategory.TELECOM
     ),
     "le mouton": CategoryMapping(
-        category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
     ),
     "eltruckdecapucho": CategoryMapping(
         category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
@@ -347,20 +347,16 @@ MERCHANT_MAPPINGS = {
         category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
     ),
     "avec": CategoryMapping(
-        category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
     ),
     "ladestation": CategoryMapping(
         category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
     ),
-    "open ride": CategoryMapping(
-        category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
-    ),
+    "open ride": CategoryMapping(category=Category.HOBBIES),
     "standing order": CategoryMapping(
         category=Category.BILLS, subcategory=BillsSubcategory.RENT
     ),
-    "activ fitness": CategoryMapping(
-        category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
-    ),
+    "activ fitness": CategoryMapping(category=Category.HOBBIES),
     "rega": CategoryMapping(
         category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
     ),
@@ -377,7 +373,7 @@ MERCHANT_MAPPINGS = {
         category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
     ),
     "jucker farm": CategoryMapping(
-        category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.DECOR
+        category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
     ),
     "gesundheitsmanagement": CategoryMapping(
         category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
@@ -478,5 +474,7 @@ MERCHANT_MAPPINGS = {
         category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
     ),
     # --- Travel ---
-    "reka": CategoryMapping(category=Category.TRAVEL),
+    "reka": CategoryMapping(
+        category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+    ),
 }
