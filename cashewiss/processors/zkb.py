@@ -20,7 +20,7 @@ from cashewiss.core.enums import (
 from cashewiss.core.text_cleaners import MERCHANT_CLEANING_PATTERNS
 
 from cashewiss.core.base import BaseTransactionProcessor, Transaction
-from cashewiss.core.merchant_mappings import SWISS_MERCHANT_MAPPINGS
+from cashewiss.core.merchant_mappings import MERCHANT_MAPPINGS
 
 
 class ZKBProcessor(BaseTransactionProcessor):
@@ -35,10 +35,17 @@ class ZKBProcessor(BaseTransactionProcessor):
         self.merchant_category_column = None
         self.description_column = "Booking text"
         self.registered_category_column = None
-        self.set_category_mapper(
-            SWISS_MERCHANT_MAPPINGS, mapper_type=self.merchant_column
-        )
+        self.set_category_mapper(MERCHANT_MAPPINGS, mapper_type=self.merchant_column)
         self.set_default_merchant_mapping()
+
+        # Patterns for detecting internal transfers
+        self.TRANSFER_PATTERNS = [
+            (r"^Debit Mobile Banking:\s*(.+)$", "external_transfer"),
+            (r".*Sanzio Monti.*$", "internal"),
+            (r".*Monti Sanzio.*$", "internal"),
+            (r".*Serena Francesca.*$", "internal"),
+            (r"^Debit Mobile Banking \(\d+\)$", "continuation"),
+        ]
 
     def load_data(
         self,
@@ -52,12 +59,22 @@ class ZKBProcessor(BaseTransactionProcessor):
         Expected CSV format has columns:
         Date;"Booking text";"ZKB reference";"Reference number";"Debit CHF";"Credit CHF";"Value date";"Balance CHF"
         """
-        df = pl.read_csv(file_path, separator=";", try_parse_dates=True)
+        df = pl.read_csv(file_path, separator=";", try_parse_dates=False)
 
         # Convert date format from DD.MM.YYYY to Date type
         df = df.with_columns(
             pl.col("Date").str.strptime(pl.Date, "%d.%m.%Y", strict=False).alias("Date")
-        ).filter(pl.col("Date").is_not_null())
+        )
+
+        # Forward-fill dates to continuation rows (Debit Mobile Banking (2), etc.)
+        df = df.with_columns(pl.col("Date").forward_fill())
+
+        # Filter out completely empty rows
+        df = df.filter(pl.col("Date").is_not_null())
+
+        # Filter out internal transfers BEFORE any other processing
+        for pattern, transfer_type in self.TRANSFER_PATTERNS:
+            df = df.filter(~pl.col("Booking text").str.contains(pattern, literal=False))
 
         # Ensure required columns exist
         required_cols = ["Date", "Booking text", "Debit CHF", "Credit CHF"]

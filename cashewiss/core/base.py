@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import date
 from typing import Optional, Dict, Any, List
+import hashlib
 
 import polars as pl
 
@@ -40,6 +41,43 @@ class TransactionBatch:
             }
             for t in self.transactions
         ]
+
+    def to_actual_format(self) -> List[Dict[str, Any]]:
+        """Convert transactions to Actual Budget format for actualpy.create_transaction()."""
+        formatted_transactions = []
+
+        for t in self.transactions:
+            # Generate imported_id using MD5 hash of date+amount+payee for duplicate detection
+            date_str = t.date.isoformat()
+            amount_str = str(abs(t.amount))
+            payee_str = t.title
+            imported_id = hashlib.md5(
+                f"{date_str}{amount_str}{payee_str}".encode()
+            ).hexdigest()
+
+            # Convert amount to cents (integer)
+            amount_cents = int(t.amount * 100)
+
+            # Map category to Actual name, use "Uncategorized" for None
+            if t.category:
+                category_name = t.category.value
+            else:
+                category_name = "Uncategorized"
+
+            # Create the formatted transaction
+            formatted_transaction = {
+                "date": t.date.isoformat(),
+                "amount": amount_cents,
+                "account": t.account or "Default Account",
+                "notes": t.notes or "",
+                "category": category_name,
+                "imported_id": imported_id,
+                "imported_payee": t.title,
+            }
+
+            formatted_transactions.append(formatted_transaction)
+
+        return formatted_transactions
 
 
 class BaseTransactionProcessor(ABC):
@@ -244,9 +282,9 @@ class BaseTransactionProcessor(ABC):
 
         # Default column names that can be overridden by processors
         self.merchant_column: str = "Merchant"
-        self.merchant_category_column: str = "Merchant Category"
+        self.merchant_category_column: Optional[str] = "Merchant Category"
         self.description_column: str = "Description"
-        self.registered_category_column: str = "Registered Category"
+        self.registered_category_column: Optional[str] = "Registered Category"
         self.amount_column: str = "Amount"
 
         # Initialize base mappings with shared merchant mappings
@@ -307,16 +345,25 @@ class BaseTransactionProcessor(ABC):
         if self.merchant_column and row.get(self.merchant_column):
             merchant = row[self.merchant_column]
 
-            # First try exact match
             merchant_lower = merchant.lower()
+
+            # First try exact match
             if mapping := self._config.merchant_mappings.get(merchant_lower):
                 return mapping
 
-            # Then try matching any word in the merchant name
-            merchant_words = set(merchant_lower.split())
-            for word in merchant_words:
-                if mapping := self._config.merchant_mappings.get(word):
+            # Then try substring matching
+            for key, mapping in self._config.merchant_mappings.items():
+                if key in merchant_lower:
                     return mapping
+
+            # Then try word-based matching (split on whitespace, dots, hyphens)
+            for sep in [" ", ".", "-"]:
+                merchant_lower = merchant_lower.replace(sep, " ")
+            merchant_parts = merchant_lower.split()
+
+            for part in merchant_parts:
+                if part and (part_mapping := self._config.merchant_mappings.get(part)):
+                    return part_mapping
 
         # Try merchant category mapping (case-insensitive)
         if self.merchant_category_column and row.get(self.merchant_category_column):

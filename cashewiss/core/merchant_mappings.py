@@ -1,7 +1,7 @@
 from cashewiss.core.models import CategoryMapping
 from cashewiss.core.enums import *
 
-SWISS_MERCHANT_MAPPINGS = {
+MERCHANT_MAPPINGS = {
     "boulderlounge": CategoryMapping(
         category=Category.HOBBIES, subcategory=HobbiesSubcategory.BOULDERN
     ),
@@ -457,4 +457,26 @@ SWISS_MERCHANT_MAPPINGS = {
     "alpinistica": CategoryMapping(
         category=Category.HOBBIES, subcategory=HobbiesSubcategory.BOULDERN
     ),
+    # --- Financial ---
+    "finpension": CategoryMapping(
+        category=Category.FINANCIAL, subcategory=FinancialSubcategory.SAVINGS
+    ),
+    "terzo": CategoryMapping(
+        category=Category.FINANCIAL, subcategory=FinancialSubcategory.SAVINGS
+    ),
+    "interactive brokers": CategoryMapping(
+        category=Category.FINANCIAL, subcategory=FinancialSubcategory.INVESTMENTS
+    ),
+    # --- Bills (taxes & donations) ---
+    "kanton": CategoryMapping(
+        category=Category.BILLS, subcategory=BillsSubcategory.TAXES
+    ),
+    "steueramt": CategoryMapping(
+        category=Category.BILLS, subcategory=BillsSubcategory.TAXES
+    ),
+    "caritas": CategoryMapping(
+        category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+    ),
+    # --- Travel ---
+    "reka": CategoryMapping(category=Category.TRAVEL),
 }
