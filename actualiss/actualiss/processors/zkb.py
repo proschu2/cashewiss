@@ -39,6 +39,19 @@ class ZKBProcessor(BaseTransactionProcessor):
                 "salary": CategoryMapping(
                     category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
                 ),
+                # 3rd pillar pension (3. Säule)
+                "terzo": CategoryMapping(
+                    category=Category.FINANCIAL,
+                    subcategory=FinancialSubcategory.INVESTMENTS,
+                ),
+                "finpension": CategoryMapping(
+                    category=Category.FINANCIAL,
+                    subcategory=FinancialSubcategory.INVESTMENTS,
+                ),
+                "sparen 3": CategoryMapping(
+                    category=Category.FINANCIAL,
+                    subcategory=FinancialSubcategory.INVESTMENTS,
+                ),
                 "caritas": CategoryMapping(
                     category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
                 ),
