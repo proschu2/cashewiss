@@ -48,7 +48,7 @@ def dry_run_process(file_path: str, processor: str, batch: Any) -> None:
     click.echo("-" * 80)
     for i, tx in enumerate(transactions[:preview_count], 1):
         click.echo(
-            f"{i:2d}. {tx['date']} | {tx['amount']:8d} | {tx['account']:15} | {tx['category']:15} | {tx['imported_payee']}"
+            f"{i:2d}. {tx['date']} | {tx['amount']:8.2f} | {tx['account']:15} | {tx['category']:15} | {tx['imported_payee']}"
         )
 
     # 2. Check for missing accounts

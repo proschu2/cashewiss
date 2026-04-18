@@ -239,6 +239,12 @@ class ZKBProcessor(BaseTransactionProcessor):
                 .str.replace_all(r"\*", " ")
                 .str.replace_all(r"\s{2,}", " ")
                 .str.strip_chars()
+                # Remove ZKB prefixes
+                .str.replace_all(r"^Purchase ZKB Visa Debit card [Nn]o\. xxxx \d+, ", "")
+                .str.replace_all(r"^Online purchase ZKB Visa Debit card no\. xxxx \d+, ", "")
+                .str.replace_all(r"^Debit Mobile Banking: ", "")
+                .str.replace_all(r"\s{2,}", " ")
+                .str.strip_chars()
                 .alias("booking_text")
             )
             .rename({"booking_text": "Booking text"})

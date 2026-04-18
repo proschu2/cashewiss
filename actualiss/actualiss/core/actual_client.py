@@ -619,7 +619,7 @@ class ActualClient:
                     # Create transaction using actualpy
                     create_transaction(
                         self._session,
-                        account_id=account_id,
+                        account=account_id,
                         date=transaction["date"],
                         amount=transaction["amount"],
                         notes=transaction.get("notes", ""),

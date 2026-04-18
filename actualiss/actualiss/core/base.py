@@ -56,8 +56,8 @@ class TransactionBatch:
                 f"{date_str}{amount_str}{payee_str}".encode()
             ).hexdigest()
 
-            # Convert amount to cents (integer)
-            amount_cents = int(t.amount * 100)
+            # Pass amount as-is (float), actual library will convert to cents internally
+            amount_value = float(t.amount)
 
             # Map category to Actual name, use "Uncategorized" for None
             if t.category:
@@ -67,8 +67,8 @@ class TransactionBatch:
 
             # Create the formatted transaction
             formatted_transaction = {
-                "date": t.date.isoformat(),
-                "amount": amount_cents,
+                "date": t.date,
+                "amount": amount_value,
                 "account": t.account or "Default Account",
                 "notes": t.notes or "",
                 "category": category_name,
