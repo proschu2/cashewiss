@@ -1,0 +1,6 @@
+Date;"Booking text";"ZKB reference";"Reference number";"Debit CHF";"Credit CHF";"Value date";"Balance CHF"
+2024-01-01;"Giroeintrag";"REF001";"123456";0.00;100.50;"2024-01-01";1000.50
+2024-01-02;"Supermarkt Einkauf";"REF002";"789012";25.00;0.00;"2024-01-02";975.50
+2024-01-03;"Restaurant Abendessen";"REF003";"345678";15.75;0.00;"2024-01-03";959.75
+2024-01-04;"Gehaltseingang";"REF004";"901234";0.00;50.00;"2024-01-04";1009.75
+2024-01-05;"Öffentl. Verkehrsmittel";"REF005";"567890";10.00;0.00;"2024-01-05";999.75

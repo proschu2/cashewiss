@@ -1,0 +1,2 @@
+Date;Booking text;Debit CHF;Credit CHF
+invalid_data;Invalid Transaction;not_a_number;also_not_a_number

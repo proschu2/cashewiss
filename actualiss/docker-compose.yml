@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  actual-budget:
+    image: actualbudget/actualbudget-server:latest
+    container_name: actual-budget
+    ports:
+      - "5006:5006"
+    volumes:
+      - actual-data:/data
+    environment:
+      - ACTUAL_PORT=5006
+      - ACTUAL_HOST=http://localhost:5006
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  actualiss:
+    build: .
+    container_name: actualiss
+    ports:
+      - "8501:8501"
+    environment:
+      - ACTUAL_SERVER_URL=http://actual-budget:5006
+      - ACTUAL_PASSWORD=secret
+      - ACTUAL_FILE=My Budget
+    depends_on:
+      actual-budget:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  actual-data:
