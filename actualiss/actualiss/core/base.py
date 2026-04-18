@@ -65,12 +65,19 @@ class TransactionBatch:
             else:
                 category_name = "Uncategorized"
 
+            # Build notes with subcategory as tag (if exists)
+            notes = t.notes or ""
+            if t.subcategory:
+                # Convert subcategory to hashtag format (lowercase, hyphens)
+                tag = f"#{t.subcategory.value.lower().replace(' ', '-').replace('_', '-')}"
+                notes = f"{notes} {tag}".strip() if notes else tag
+
             # Create the formatted transaction
             formatted_transaction = {
                 "date": t.date,
                 "amount": amount_value,
                 "account": t.account or "Default Account",
-                "notes": t.notes or "",
+                "notes": notes,
                 "category": category_name,
                 "imported_id": imported_id,
                 "imported_payee": t.title,
