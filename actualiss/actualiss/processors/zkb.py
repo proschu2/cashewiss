@@ -265,6 +265,7 @@ class ZKBProcessor(BaseTransactionProcessor):
                 .str.replace_all(r"^Debit eBill: ", "")
                 .str.replace_all(r"^Credit eBill: ", "")
                 .str.replace_all(r"^Credit originator: ", "")
+                .str.replace_all(r"^Credit Account transfer: ", "")
                 .str.replace_all(r"^Credit salary: ", "")
                 .str.replace_all(r"^Credit Salary: ", "")
                 # Generic cleanup
