@@ -444,9 +444,6 @@ class BaseTransactionProcessor(ABC):
         "standing order": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.RENT
         ),
-        "activ fitness": CategoryMapping(
-            category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
-        ),
         "rega": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
         ),
@@ -572,7 +569,9 @@ class BaseTransactionProcessor(ABC):
             category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
         ),
         "open ride": CategoryMapping(category=Category.HOBBIES),
-        "activ fitness": CategoryMapping(category=Category.HOBBIES),
+        "activ fitness": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.PERSONAL
+        ),
         "jucker farm": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
         ),
