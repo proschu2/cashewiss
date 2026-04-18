@@ -41,9 +41,6 @@ class ZKBProcessor(BaseTransactionProcessor):
         # Patterns for detecting internal transfers
         self.TRANSFER_PATTERNS = [
             (r"^Debit Mobile Banking:\s*(.+)$", "external_transfer"),
-            (r".*Sanzio Monti.*$", "internal"),
-            (r".*Monti Sanzio.*$", "internal"),
-            (r".*Serena Francesca.*$", "internal"),
             (r"^Debit Mobile Banking \(\d+\)$", "continuation"),
         ]
 
@@ -73,8 +70,25 @@ class ZKBProcessor(BaseTransactionProcessor):
         df = df.filter(pl.col("Date").is_not_null())
 
         # Filter out internal transfers BEFORE any other processing
+        # But first extract payee names from "Debit Mobile Banking: ..." entries
+        def extract_mobile_banking_payee(booking_text):
+            """Extract real payee from 'Debit Mobile Banking: Payee Name' format."""
+            if ":" in booking_text and "Mobile Banking" in booking_text:
+                return booking_text.split(":", 1)[1].strip()
+            return booking_text
+
+        # Apply extraction to external transfer patterns
         for pattern, transfer_type in self.TRANSFER_PATTERNS:
-            df = df.filter(~pl.col("Booking text").str.contains(pattern, literal=False))
+            if transfer_type == "external_transfer":
+                # Extract payee name instead of filtering
+                df = df.with_columns(
+                    pl.col("Booking text").map_elements(extract_mobile_banking_payee)
+                )
+            else:
+                # Filter out continuation rows and other noise
+                df = df.filter(
+                    ~pl.col("Booking text").str.contains(pattern, literal=False)
+                )
 
         # Ensure required columns exist
         required_cols = ["Date", "Booking text", "Debit CHF", "Credit CHF"]
