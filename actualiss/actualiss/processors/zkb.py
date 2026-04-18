@@ -21,6 +21,7 @@ class ZKBProcessor(BaseTransactionProcessor):
         self.account_name = account or "Montis"
         # Override default column names for ZKB format
         self.merchant_column = "Booking text"
+        self.amount_column = "amount"  # Match the key used in transform_data
         # ZKB doesn't provide merchant categories
         self.merchant_category_column = None
         self.description_column = "Booking text"
