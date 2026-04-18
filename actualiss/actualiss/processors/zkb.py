@@ -36,6 +36,9 @@ class ZKBProcessor(BaseTransactionProcessor):
                 "post ch ag": CategoryMapping(
                     category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
                 ),
+                "salary": CategoryMapping(
+                    category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
+                ),
                 "caritas": CategoryMapping(
                     category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
                 ),
@@ -240,10 +243,17 @@ class ZKBProcessor(BaseTransactionProcessor):
                 .str.replace_all(r"\*", " ")
                 .str.replace_all(r"\s{2,}", " ")
                 .str.strip_chars()
-                # Remove ZKB prefixes
+                # Remove ZKB-specific prefixes (order matters - most specific first)
                 .str.replace_all(r"^Purchase ZKB Visa Debit card [Nn]o\. xxxx \d+, ", "")
                 .str.replace_all(r"^Online purchase ZKB Visa Debit card no\. xxxx \d+, ", "")
                 .str.replace_all(r"^Debit Mobile Banking: ", "")
+                .str.replace_all(r"^Credit TWINT: ", "")
+                .str.replace_all(r"^Debit TWINT: ", "")
+                .str.replace_all(r"^Debit eBill: ", "")
+                .str.replace_all(r"^Credit eBill: ", "")
+                .str.replace_all(r"^Credit salary: ", "")
+                .str.replace_all(r"^Credit Salary: ", "")
+                # Generic cleanup
                 .str.replace_all(r"\s{2,}", " ")
                 .str.strip_chars()
                 .alias("booking_text")
