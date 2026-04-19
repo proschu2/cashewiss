@@ -61,6 +61,7 @@ class ZKBProcessor(BaseTransactionProcessor):
                     subcategory=FinancialSubcategory.INVESTMENTS,
                 ),
                 "revolut": CategoryMapping(category=Category.TRAVEL),
+        "wise": CategoryMapping(category=Category.TRAVEL),
             },
             mapper_type=self.merchant_column,
         )

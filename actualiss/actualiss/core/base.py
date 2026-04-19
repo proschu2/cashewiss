@@ -248,6 +248,7 @@ class BaseTransactionProcessor(ABC):
         "easyjet": CategoryMapping(
             category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
         ),
+        "wise": CategoryMapping(category=Category.TRAVEL),
         "bitwarden.com": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
         ),
@@ -582,6 +583,23 @@ class BaseTransactionProcessor(ABC):
         "jucker farm": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
         ),
+        # --- Payment services ---
+        "sumup": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # --- Personal services ---
+        "terra": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        # --- Donations ---
+        "caritas": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+        ),
+        # --- Internal transfers (Sanzio ↔ Serena) ---
+        "sanzio": CategoryMapping(category=Category.HOUSEHOLD),
+        "serena": CategoryMapping(category=Category.HOUSEHOLD),
+        "caldari": CategoryMapping(category=Category.HOUSEHOLD),
+        "monti": CategoryMapping(category=Category.HOUSEHOLD),
     }
 
     def __init__(self, name: str):
@@ -656,21 +674,32 @@ class BaseTransactionProcessor(ABC):
         if self.merchant_column and row.get(self.merchant_column):
             merchant = row[self.merchant_column]
 
+            # Clean merchant name for better matching (remove asterisks, zeros, extra spaces)
+            import re
+            merchant_clean = re.sub(r'\*+', ' ', merchant)  # Remove all asterisks (even attached)
+            merchant_clean = re.sub(r'\s+0{4,}\b', '', merchant_clean)  # Remove 00000
+            merchant_clean = re.sub(r'\s{2,}', ' ', merchant_clean)  # Normalize spaces
+            merchant_clean = merchant_clean.strip().lower()
+
             # First try exact match
-            merchant_lower = merchant.lower()
-            if mapping := self._config.merchant_mappings.get(merchant_lower):
+            if mapping := self._config.merchant_mappings.get(merchant_clean):
                 return mapping
 
             # Then try matching any word in the merchant name
-            merchant_words = set(merchant_lower.split())
+            merchant_words = set(merchant_clean.split())
             for word in merchant_words:
                 if mapping := self._config.merchant_mappings.get(word):
                     return mapping
 
             # Then try substring matching (handles merged/hyphenated tokens)
             for key, mapping in self._config.merchant_mappings.items():
-                if key in merchant_lower:
+                if key in merchant_clean:
                     return mapping
+
+            # Fallback to original merchant (for backward compatibility)
+            merchant_lower = merchant.lower()
+            if mapping := self._config.merchant_mappings.get(merchant_lower):
+                return mapping
 
         # Try merchant category mapping (case-insensitive)
         if self.merchant_category_column and row.get(self.merchant_category_column):
