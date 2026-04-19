@@ -69,7 +69,16 @@ class ZKBProcessor(BaseTransactionProcessor):
         # Patterns for detecting internal transfers
         self.TRANSFER_PATTERNS = [
             (r"^Debit Mobile Banking:\s*(.+)$", "external_transfer"),
-            (r"^Debit Mobile Banking \(\d+\)$", "continuation"),
+        ]
+
+        # Payee rewrite rules: normalize long payee names (applied in Polars cleanup)
+        self.PAYEE_REWRITES = [
+            (r"\bInteractive Brokers LLC,.*$", "Interactive Brokers"),
+            (r"^U\d+\s*/.*$", "Interactive Brokers"),
+            (r"\bBaugenossenschaft der Strassenbahner.*$", "Baugenossenschaft"),
+            (r"\bfinpension 3a Retirement Savings Foundation,.*$", "Finpension"),
+            (r"\bTerzo Vorsorgestiftung der WIR Bank,.*$", "Terzo"),
+            (r"\bYubelky Jimenez Ortiz,.*$", "Yubelky"),
         ]
 
     def load_data(
@@ -151,11 +160,16 @@ class ZKBProcessor(BaseTransactionProcessor):
 
                 # Type 1: Description override (single row with Payment purpose)
                 if date_val and payment_purpose and "Standing order" in booking_text:
-                    # Use Payment purpose as the payee, Details for notes
+                    # If payment purpose is an account reference (U\d+ / ...), keep booking text
+                    # which will be cleaned by payee rewrites later
+                    if re.match(r"^U\d+", payment_purpose.strip()):
+                        effective_payee = booking_text  # Keep booking_text, rewrites will clean it
+                    else:
+                        effective_payee = payment_purpose  # Use human-readable description
                     self.transactions.append(
                         {
                             "date": date_val,
-                            "booking_text": payment_purpose,  # Override with Payment purpose
+                            "booking_text": effective_payee,
                             "amount": self._parse_amount(row),
                             "reference": row.get("ZKB reference", ""),
                             "details": details,
@@ -163,9 +177,10 @@ class ZKBProcessor(BaseTransactionProcessor):
                         }
                     )
 
-                # Type 2a: Split payment header (skip but remember date)
-                elif date_val and "(" in booking_text and ")" in booking_text:
-                    self.current_date = date_val  # Remember date for continuations
+                # Type 2a: Aggregation header for standing orders / mobile banking
+                elif date_val and re.match(r"^Debit (Standing order|Mobile Banking) \(\d+\)$", booking_text):
+                    # Remember date for detail rows below
+                    self.current_date = date_val
 
                 # Type 2b: Split payment continuation (real transaction)
                 elif not date_val and booking_text and amount_details:
@@ -244,6 +259,11 @@ class ZKBProcessor(BaseTransactionProcessor):
         if date_to is not None:
             df = df.filter(pl.col("date") <= date_to)
 
+        # Detect TWINT transactions BEFORE stripping prefixes (is_twint detection bug fix)
+        df = df.with_columns(
+            pl.col("booking_text").str.contains("(?i)twint").alias("is_twint")
+        )
+
         df = (
             df.with_columns(
                 pl.col("booking_text")
@@ -259,6 +279,7 @@ class ZKBProcessor(BaseTransactionProcessor):
                 # Remove ZKB-specific prefixes (order matters - most specific first)
                 .str.replace_all(r"^Purchase ZKB Visa Debit card [Nn]o\. xxxx \d+, ", "")
                 .str.replace_all(r"^Online purchase ZKB Visa Debit card no\. xxxx \d+, ", "")
+                .str.replace_all(r"^Debit Standing order: ", "")
                 .str.replace_all(r"^Debit Mobile Banking: ", "")
                 .str.replace_all(r"^Credit TWINT: ", "")
                 .str.replace_all(r"^Debit TWINT: ", "")
@@ -274,7 +295,16 @@ class ZKBProcessor(BaseTransactionProcessor):
                 .str.strip_chars()
                 .alias("booking_text")
             )
-            .rename({"booking_text": "Booking text"})
+        )
+
+        # Apply payee rewrite rules (normalize long payee names)
+        result = pl.col("booking_text")
+        for pattern, replacement in self.PAYEE_REWRITES:
+            result = result.str.replace_all(pattern, replacement)
+        df = df.with_columns(result.alias("booking_text"))
+
+        df = (
+            df.rename({"booking_text": "Booking text"})
             .filter(~pl.col("Booking text").str.contains("Viseca|Swisscard"))
         )
 
@@ -322,12 +352,20 @@ class ZKBProcessor(BaseTransactionProcessor):
                 }
             )
 
+            # Build notes: start with processor name, add #twint if applicable
+            is_twint = row.get("is_twint", False)
+            notes = self.name  # "ZKB"
+
+            # Add #twint tag unless subcategory is already Twint (avoid duplication)
+            if is_twint and not (mapping.subcategory and mapping.subcategory.value == "Twint"):
+                notes = f"{notes} #twint".strip()
+
             transaction = Transaction(
                 date=row["date"],
                 title=row["Booking text"],
                 amount=float(row["amount"]),
                 currency="CHF",
-                notes=self.name,
+                notes=notes,
                 category=mapping.category,
                 subcategory=mapping.subcategory,
                 account=self.account_name,

@@ -466,7 +466,7 @@ class ActualClient:
 
         log_api_call(logger, "_create_account", name=name, account_type=account_type)
         logger.info(f"Creating new account: {name} (type: {account_type})")
-        account = get_or_create_account(self._session, name, type=account_type)
+        account = get_or_create_account(self._session, name)
         log_api_success(
             logger,
             "_create_account",
