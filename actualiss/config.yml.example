@@ -1,0 +1,7 @@
+# Category Mapping Configuration
+# This file allows customization of Cashew → Actual category mappings
+  
+custom_category_mappings:
+  # Example: Override specific mappings
+  # DINING: "Eating Out"  # Override default "Dining"
+  # GROCERIES: "Food & Groceries"  # Override default "Groceries"

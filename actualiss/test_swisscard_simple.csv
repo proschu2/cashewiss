@@ -1,0 +1,6 @@
+Date,Betrag,Kontonummer,Buchungstext,Valuta,Saldo
+2024-01-01,100.50,CH123456789,Giroeintrag,2024-01-01,1000.50
+2024-01-02,-25.00,CH123456789,Supermarkt Einkauf,2024-01-02,975.50
+2024-01-03,-15.75,CH123456789,Restaurant Abendessen,2024-01-03,959.75
+2024-01-04,50.00,CH123456789,Gehaltseingang,2024-01-04,1009.75
+2024-01-05,-10.00,CH123456789,Öffentl. Verkehrsmittel,2024-01-05,999.75

@@ -1,0 +1,5 @@
+✓ Config loaded:
+  server_url: http://localhost:5006
+  password: test123
+  file: Test Budget
+  encryption_password: None

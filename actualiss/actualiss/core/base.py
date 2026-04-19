@@ -11,6 +11,7 @@ from .enums import (
     Category,
     DiningSubcategory,
     EssentialsSubcategory,
+    FinancialSubcategory,
     HouseholdSubcategory,
     IncomeSubcategory,
     ShoppingSubcategory,
@@ -55,8 +56,8 @@ class TransactionBatch:
                 f"{date_str}{amount_str}{payee_str}".encode()
             ).hexdigest()
 
-            # Convert amount to cents (integer)
-            amount_cents = int(t.amount * 100)
+            # Pass amount as-is (float), actual library will convert to cents internally
+            amount_value = float(t.amount)
 
             # Map category to Actual name, use "Uncategorized" for None
             if t.category:
@@ -64,12 +65,19 @@ class TransactionBatch:
             else:
                 category_name = "Uncategorized"
 
+            # Build notes with subcategory as tag (if exists)
+            notes = t.notes or ""
+            if t.subcategory:
+                # Convert subcategory to hashtag format (lowercase, hyphens)
+                tag = f"#{t.subcategory.value.lower().replace(' ', '-').replace('_', '-')}"
+                notes = f"{notes} {tag}".strip() if notes else tag
+
             # Create the formatted transaction
             formatted_transaction = {
-                "date": t.date.isoformat(),
-                "amount": amount_cents,
+                "date": t.date,
+                "amount": amount_value,
                 "account": t.account or "Default Account",
-                "notes": t.notes or "",
+                "notes": notes,
                 "category": category_name,
                 "imported_id": imported_id,
                 "imported_payee": t.title,
@@ -167,6 +175,9 @@ class BaseTransactionProcessor(ABC):
         "uber eats": CategoryMapping(
             category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
         ),
+        "uber trip": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
         "openair": CategoryMapping(
             category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
         ),
@@ -237,6 +248,7 @@ class BaseTransactionProcessor(ABC):
         "easyjet": CategoryMapping(
             category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
         ),
+        "wise": CategoryMapping(category=Category.TRAVEL),
         "bitwarden.com": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
         ),
@@ -271,6 +283,323 @@ class BaseTransactionProcessor(ABC):
         "helsana": CategoryMapping(
             category=Category.BILLS, subcategory=BillsSubcategory.INSURANCE
         ),
+        # --- Swiss groceries ---
+        "coop": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "migros": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "lidl": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "volg": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "aldi": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "denner": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "spar": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        # --- Transit ---
+        "lime": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "parking": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "taxi": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # --- Dining ---
+        "brezel": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "stazione": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "kafi": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "confiseur": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "penisola": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "giro": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "donald": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.DELIVERY
+        ),
+        # --- Household ---
+        "mr. green": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.CLEANING
+        ),
+        "yubelky": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.CLEANING
+        ),
+        # --- Shopping specifics ---
+        "zalando": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "claire's": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "adc": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "wos.ch": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.MEDIA
+        ),
+        "felfel": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        "nooba": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "kebap": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "rice-go": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "ristorante": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "manora": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "tibits": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "noodlee": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "pizzeria": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "thai": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "bistro": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "higashi": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "john baker": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "mister cordon": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "rapido": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "selecta": CategoryMapping(category=Category.DINING),
+        "amboss": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "oh my greek": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "caf bebek": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "my mythos": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "spusu": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TELECOM
+        ),
+        "le mouton": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "eltruckdecapucho": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "bahnhofkiosk": CategoryMapping(category=Category.DINING),
+        "migrolino": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "new asia market": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "manor ag": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "shell": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "avia": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "avec": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "ladestation": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "open ride": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "standing order": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.RENT
+        ),
+        "rega": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+        ),
+        "zivilstandsamt": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.FEES
+        ),
+        "digitec": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "nettoshop": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.APPLIANCES
+        ),
+        "brack.ch": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.ELECTRONICS
+        ),
+        "jucker farm": CategoryMapping(
+            category=Category.HOUSEHOLD, subcategory=HouseholdSubcategory.DECOR
+        ),
+        "gesundheitsmanagement": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "spital": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "treatwell": CategoryMapping(
+            category=Category.PERSONAL_CARE,
+            subcategory=PersonalCareSubcategory.PERSONAL,
+        ),
+        "apo doc": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "dr.andres": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        "blue cinema": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "eventfrog": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+        ),
+        "mountain adventures": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "weisse arena": CategoryMapping(
+            category=Category.LEISURE, subcategory=LeisureSubcategory.ACTIVITIES
+        ),
+        "qoqa": CategoryMapping(category=Category.SHOPPING),
+        "deindeal": CategoryMapping(category=Category.SHOPPING),
+        "suit supply": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "keeper concept": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "ursi's": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "infomaniak": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.SUBSCRIPTIONS
+        ),
+        "fusion dance": CategoryMapping(
+            category=Category.HOBBIES, subcategory=HobbiesSubcategory.SALSA
+        ),
+        "gameorama": CategoryMapping(
+            category=Category.HOBBIES, subcategory=HobbiesSubcategory.TECH
+        ),
+        "wal cochin": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "qoqa": CategoryMapping(category=Category.SHOPPING),
+        "deindeal": CategoryMapping(category=Category.DINING),
+        "moser": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "menza": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        "mensa": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.WORK
+        ),
+        "bachbuck": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "imranli": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "moschti": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        "leonard pjetraj": CategoryMapping(category=Category.INCOME),
+        "pg 8152": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        "alpinistica": CategoryMapping(
+            category=Category.HOBBIES, subcategory=HobbiesSubcategory.BOULDERN
+        ),
+        # --- Financial ---
+        "finpension": CategoryMapping(
+            category=Category.FINANCIAL, subcategory=FinancialSubcategory.SAVINGS
+        ),
+        "terzo": CategoryMapping(
+            category=Category.FINANCIAL, subcategory=FinancialSubcategory.SAVINGS
+        ),
+        "interactive brokers": CategoryMapping(
+            category=Category.FINANCIAL, subcategory=FinancialSubcategory.INVESTMENTS
+        ),
+        # --- Bills (taxes & donations) ---
+        "kanton": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TAXES
+        ),
+        "steueramt": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.TAXES
+        ),
+        # --- Travel/Transit ---
+        "reka": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # --- Corrections based on usage ---
+        "le mouton": CategoryMapping(
+            category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+        ),
+        "avec": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.GROCERIES
+        ),
+        "open ride": CategoryMapping(category=Category.HOBBIES),
+        "activ fitness": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.PERSONAL
+        ),
+        "jucker farm": CategoryMapping(
+            category=Category.DINING, subcategory=DiningSubcategory.SOCIAL
+        ),
+        # --- Payment services ---
+        "sumup": CategoryMapping(
+            category=Category.ESSENTIALS, subcategory=EssentialsSubcategory.TRANSIT
+        ),
+        # --- Personal services ---
+        "terra": CategoryMapping(
+            category=Category.PERSONAL_CARE, subcategory=PersonalCareSubcategory.MEDICAL
+        ),
+        # --- Donations ---
+        "caritas": CategoryMapping(
+            category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+        ),
+        # --- Internal transfers (Sanzio ↔ Serena) ---
+        "sanzio": CategoryMapping(category=Category.HOUSEHOLD),
+        "serena": CategoryMapping(category=Category.HOUSEHOLD),
+        "caldari": CategoryMapping(category=Category.HOUSEHOLD),
+        "monti": CategoryMapping(category=Category.HOUSEHOLD),
     }
 
     def __init__(self, name: str):
@@ -282,9 +611,9 @@ class BaseTransactionProcessor(ABC):
 
         # Default column names that can be overridden by processors
         self.merchant_column: str = "Merchant"
-        self.merchant_category_column: Optional[str] = "Merchant Category"
+        self.merchant_category_column: str = "Merchant Category"
         self.description_column: str = "Description"
-        self.registered_category_column: Optional[str] = "Registered Category"
+        self.registered_category_column: str = "Registered Category"
         self.amount_column: str = "Amount"
 
         # Initialize base mappings with shared merchant mappings
@@ -345,25 +674,32 @@ class BaseTransactionProcessor(ABC):
         if self.merchant_column and row.get(self.merchant_column):
             merchant = row[self.merchant_column]
 
-            merchant_lower = merchant.lower()
+            # Clean merchant name for better matching (remove asterisks, zeros, extra spaces)
+            import re
+            merchant_clean = re.sub(r'\*+', ' ', merchant)  # Remove all asterisks (even attached)
+            merchant_clean = re.sub(r'\s+0{4,}\b', '', merchant_clean)  # Remove 00000
+            merchant_clean = re.sub(r'\s{2,}', ' ', merchant_clean)  # Normalize spaces
+            merchant_clean = merchant_clean.strip().lower()
 
             # First try exact match
-            if mapping := self._config.merchant_mappings.get(merchant_lower):
+            if mapping := self._config.merchant_mappings.get(merchant_clean):
                 return mapping
 
-            # Then try substring matching
-            for key, mapping in self._config.merchant_mappings.items():
-                if key in merchant_lower:
+            # Then try matching any word in the merchant name
+            merchant_words = set(merchant_clean.split())
+            for word in merchant_words:
+                if mapping := self._config.merchant_mappings.get(word):
                     return mapping
 
-            # Then try word-based matching (split on whitespace, dots, hyphens)
-            for sep in [" ", ".", "-"]:
-                merchant_lower = merchant_lower.replace(sep, " ")
-            merchant_parts = merchant_lower.split()
+            # Then try substring matching (handles merged/hyphenated tokens)
+            for key, mapping in self._config.merchant_mappings.items():
+                if key in merchant_clean:
+                    return mapping
 
-            for part in merchant_parts:
-                if part and (part_mapping := self._config.merchant_mappings.get(part)):
-                    return part_mapping
+            # Fallback to original merchant (for backward compatibility)
+            merchant_lower = merchant.lower()
+            if mapping := self._config.merchant_mappings.get(merchant_lower):
+                return mapping
 
         # Try merchant category mapping (case-insensitive)
         if self.merchant_category_column and row.get(self.merchant_category_column):

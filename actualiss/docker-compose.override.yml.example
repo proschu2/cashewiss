@@ -1,0 +1,21 @@
+# Docker Compose Override Configuration
+# Use this file to override default docker-compose.yml settings
+  
+services:
+  actual-budget:
+    # Override Actual Budget settings
+    environment:
+      - ACTUAL_HTTPS_PORT=443
+    ports:
+      - "443:443"
+    volumes:
+      - ./custom-budget-data:/data
+  
+  actualiss:
+    # Override actualiss settings
+    environment:
+      - ACTUALISS_VERBOSE=true
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./custom-logs:/logs

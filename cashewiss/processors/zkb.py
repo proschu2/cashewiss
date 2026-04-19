@@ -1,16 +1,26 @@
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Tuple
+import re
+import csv
 import polars as pl
 
 from cashewiss.core.models import CategoryMapping
 from cashewiss.core.enums import (
     BillsSubcategory,
     Category,
+    EssentialsSubcategory,
     FinancialSubcategory,
+    HouseholdSubcategory,
     IncomeSubcategory,
+    LeisureSubcategory,
+    PersonalCareSubcategory,
+    ShoppingSubcategory,
+    TravelSubcategory,
 )
+from cashewiss.core.text_cleaners import MERCHANT_CLEANING_PATTERNS
 
 from cashewiss.core.base import BaseTransactionProcessor, Transaction
+from cashewiss.core.merchant_mappings import MERCHANT_MAPPINGS
 
 
 class ZKBProcessor(BaseTransactionProcessor):
@@ -25,29 +35,14 @@ class ZKBProcessor(BaseTransactionProcessor):
         self.merchant_category_column = None
         self.description_column = "Booking text"
         self.registered_category_column = None
-
-        # Set up base merchant mappings
-        self.set_category_mapper(
-            {
-                "monti sanzio & caldari serena, hohlstrasse 117": CategoryMapping(
-                    category=Category.HOUSEHOLD,
-                ),
-                "post ch ag": CategoryMapping(
-                    category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
-                ),
-                "caritas": CategoryMapping(
-                    category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
-                ),
-                "wise": CategoryMapping(category=Category.TRAVEL),
-                "brokers": CategoryMapping(
-                    category=Category.FINANCIAL,
-                    subcategory=FinancialSubcategory.INVESTMENTS,
-                ),
-                "revolut": CategoryMapping(category=Category.TRAVEL),
-            },
-            mapper_type=self.merchant_column,
-        )
+        self.set_category_mapper(MERCHANT_MAPPINGS, mapper_type=self.merchant_column)
         self.set_default_merchant_mapping()
+
+        # Patterns for detecting internal transfers
+        self.TRANSFER_PATTERNS = [
+            (r"^Debit Mobile Banking:\s*(.+)$", "external_transfer"),
+            (r"^Debit Mobile Banking \(\d+\)$", "continuation"),
+        ]
 
     def load_data(
         self,
@@ -61,7 +56,39 @@ class ZKBProcessor(BaseTransactionProcessor):
         Expected CSV format has columns:
         Date;"Booking text";"ZKB reference";"Reference number";"Debit CHF";"Credit CHF";"Value date";"Balance CHF"
         """
-        df = pl.read_csv(file_path, separator=";", try_parse_dates=True)
+        df = pl.read_csv(file_path, separator=";", try_parse_dates=False)
+
+        # Convert date format from DD.MM.YYYY to Date type
+        df = df.with_columns(
+            pl.col("Date").str.strptime(pl.Date, "%d.%m.%Y", strict=False).alias("Date")
+        )
+
+        # Forward-fill dates to continuation rows (Debit Mobile Banking (2), etc.)
+        df = df.with_columns(pl.col("Date").forward_fill())
+
+        # Filter out completely empty rows
+        df = df.filter(pl.col("Date").is_not_null())
+
+        # Filter out internal transfers BEFORE any other processing
+        # But first extract payee names from "Debit Mobile Banking: ..." entries
+        def extract_mobile_banking_payee(booking_text):
+            """Extract real payee from 'Debit Mobile Banking: Payee Name' format."""
+            if ":" in booking_text and "Mobile Banking" in booking_text:
+                return booking_text.split(":", 1)[1].strip()
+            return booking_text
+
+        # Apply extraction to external transfer patterns
+        for pattern, transfer_type in self.TRANSFER_PATTERNS:
+            if transfer_type == "external_transfer":
+                # Extract payee name instead of filtering
+                df = df.with_columns(
+                    pl.col("Booking text").map_elements(extract_mobile_banking_payee)
+                )
+            else:
+                # Filter out continuation rows and other noise
+                df = df.filter(
+                    ~pl.col("Booking text").str.contains(pattern, literal=False)
+                )
 
         # Ensure required columns exist
         required_cols = ["Date", "Booking text", "Debit CHF", "Credit CHF"]
@@ -141,7 +168,13 @@ class ZKBProcessor(BaseTransactionProcessor):
         # Remove Viseca and Swisscard entries
         df = df.filter(~pl.col("Booking text").str.contains("Viseca|Swisscard"))
 
-        # Apply date filtering if provided
+        for pattern, replacement in MERCHANT_CLEANING_PATTERNS:
+            df = df.with_columns(
+                pl.col("Booking text")
+                .str.replace_all(pattern, replacement)
+                .alias("Booking text")
+            )
+
         if date_from is not None:
             df = df.filter(pl.col("Date") >= date_from)
         if date_to is not None:
