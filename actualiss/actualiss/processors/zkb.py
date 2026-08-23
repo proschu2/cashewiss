@@ -2,12 +2,19 @@ from datetime import date
 from typing import Optional, List
 import polars as pl
 
+from typing import Optional, List, Dict, Any
 from actualiss.core.models import CategoryMapping
 from actualiss.core.enums import (
     BillsSubcategory,
+    EssentialsSubcategory,
     Category,
     FinancialSubcategory,
+    HobbiesSubcategory,
     IncomeSubcategory,
+    LeisureSubcategory,
+    PersonalCareSubcategory,
+    ShoppingSubcategory,
+    TravelSubcategory,
 )
 
 from actualiss.core.base import BaseTransactionProcessor, Transaction
@@ -55,13 +62,62 @@ class ZKBProcessor(BaseTransactionProcessor):
                 "caritas": CategoryMapping(
                     category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
                 ),
+                # Donations (added Aug 2026: were falling to Shopping default)
+                "unicef": CategoryMapping(
+                    category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+                ),
+                "médecins": CategoryMapping(
+                    category=Category.BILLS, subcategory=BillsSubcategory.DONATIONS
+                ),
+                # Taxes — Italian federal tax administration (K8SM bills)
+                "amministrazione federale": CategoryMapping(
+                    category=Category.BILLS, subcategory=BillsSubcategory.TAXES
+                ),
+                # Fuel (added Aug 2026: were landing Groceries/Shopping/Food & Drink)
+                "migrol": CategoryMapping(
+                    category=Category.ESSENTIALS,
+                    subcategory=EssentialsSubcategory.TRANSIT,
+                ),
+                "agip": CategoryMapping(
+                    category=Category.ESSENTIALS,
+                    subcategory=EssentialsSubcategory.TRANSIT,
+                ),
+                # Badi / swimming (was Shopping)
+                "lettenbadi": CategoryMapping(category=Category.LEISURE),
                 "wise": CategoryMapping(category=Category.TRAVEL),
                 "brokers": CategoryMapping(
                     category=Category.FINANCIAL,
                     subcategory=FinancialSubcategory.INVESTMENTS,
                 ),
                 "revolut": CategoryMapping(category=Category.TRAVEL),
-        "wise": CategoryMapping(category=Category.TRAVEL),
+                # Refund merchants — keep their original categories
+                "about you": CategoryMapping(
+                    category=Category.SHOPPING, subcategory=ShoppingSubcategory.CLOTHING
+                ),
+                "europcar": CategoryMapping(
+                    category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
+                ),
+                "stressfreecarrental": CategoryMapping(
+                    category=Category.TRAVEL, subcategory=TravelSubcategory.TRANSPORT
+                ),
+                # Wedding-related merchants
+                "moschti stäfa": CategoryMapping(
+                    category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+                ),
+                "daniel schuler": CategoryMapping(
+                    category=Category.LEISURE, subcategory=LeisureSubcategory.EVENTS
+                ),
+                "monique caetano beauty": CategoryMapping(
+                    category=Category.PERSONAL_CARE,
+                    subcategory=PersonalCareSubcategory.PERSONAL,
+                ),
+                # Hobbies
+                "swiss photo club": CategoryMapping(
+                    category=Category.HOBBIES,
+                ),
+                "fusion dance studios": CategoryMapping(
+                    category=Category.HOBBIES, subcategory=HobbiesSubcategory.SALSA
+                ),
             },
             mapper_type=self.merchant_column,
         )
@@ -80,6 +136,15 @@ class ZKBProcessor(BaseTransactionProcessor):
             (r"\bfinpension 3a Retirement Savings Foundation,.*$", "Finpension"),
             (r"\bTerzo Vorsorgestiftung der WIR Bank,.*$", "Terzo"),
             (r"\bYubelky Jimenez Ortiz,.*$", "Yubelky"),
+            (r"\bABOUT YOU 00000.*$", "About You"),
+            (r"\bEuropcar\.com/ch.*$", "Europcar"),
+            (r"\bSTRESSFREECARRENTAL 00000.*$", "Stressfreecarrental"),
+            (r"\bMoschti Stäfa GmbH.*$", "Moschti Stäfa"),
+            (r"\bDaniel Schuler.*$", "Daniel Schuler"),
+            (r"\bMONIQUE CAETANO BEAUTY.*$", "Monique Caetano Beauty"),
+            (r"\bSWISS PHOTO CLUB.*$", "Swiss Photo Club"),
+            (r"\bSalsaRica AG.*$", "SalsaRica"),
+            (r"\bFusion Dance Studios GmbH.*$", "Fusion Dance Studios"),
         ]
 
     def load_data(
@@ -280,6 +345,8 @@ class ZKBProcessor(BaseTransactionProcessor):
                 # Remove ZKB-specific prefixes (order matters - most specific first)
                 .str.replace_all(r"^Purchase ZKB Visa Debit card [Nn]o\. xxxx \d+, ", "")
                 .str.replace_all(r"^Online purchase ZKB Visa Debit card no\. xxxx \d+, ", "")
+                .str.replace_all(r"^Refund ZKB Visa Debit card no\. xxxx \d+, ", "")
+                .str.replace_all(r"^Refund notes ZKB Visa Debit card Nr\. xxxx \d+, ", "")
                 .str.replace_all(r"^Debit Standing order: ", "")
                 .str.replace_all(r"^Debit Mobile Banking: ", "")
                 .str.replace_all(r"^Credit TWINT: ", "")
@@ -335,6 +402,25 @@ class ZKBProcessor(BaseTransactionProcessor):
             credit = 0.0
 
         return credit - debit
+
+    def _map_category(self, row: Dict[str, Any]) -> CategoryMapping:
+        """Override to handle amount-dependent category mapping (e.g. SalsaRica salary)."""
+        merchant = (row.get(self.merchant_column, "") or "").lower()
+        amount = float(row.get("amount", 0) or 0)
+
+        # SalsaRica: positive = Serena's salary, negative = dance classes
+        if "salsarica" in merchant:
+            if amount > 0:
+                return CategoryMapping(
+                    category=Category.INCOME, subcategory=IncomeSubcategory.SALARY
+                )
+            else:
+                return CategoryMapping(
+                    category=Category.HOBBIES, subcategory=HobbiesSubcategory.SALSA
+                )
+
+        # Let base class handle everything else
+        return super()._map_category(row)
 
     def transform_data(self) -> List[Transaction]:
         """Transform ZKB data into standardized Transaction objects."""
